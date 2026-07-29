@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MeetingSearch</title>
+    <style>
+      :root {
+        --ink: #1a1f2e;
+        --muted: #5c6578;
+        --line: #d8dde8;
+        --bg: #f3f5f9;
+        --panel: #ffffff;
+        --accent: #0f6b5c;
+        --accent-soft: #e6f3f0;
+        --danger: #9b2c2c;
+        --danger-bg: #fdeaea;
+        --recommend: #0b4f44;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(ellipse 80% 50% at 10% -10%, #d7ebe6 0%, transparent 55%),
+          radial-gradient(ellipse 60% 40% at 100% 0%, #e4e9f5 0%, transparent 50%),
+          var(--bg);
+        min-height: 100vh;
+      }
+
+      main {
+        max-width: 880px;
+        margin: 0 auto;
+        padding: 2.5rem 1.25rem 4rem;
+      }
+
+      h1 {
+        font-family: "IBM Plex Serif", Georgia, serif;
+        font-weight: 600;
+        font-size: clamp(2rem, 4vw, 2.75rem);
+        letter-spacing: -0.02em;
+        margin: 0 0 0.35rem;
+      }
+
+      .lede {
+        color: var(--muted);
+        margin: 0 0 2rem;
+        max-width: 36rem;
+        line-height: 1.5;
+      }
+
+      form {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        padding: 1.25rem 1.35rem 1.5rem;
+        display: grid;
+        gap: 1rem;
+      }
+
+      label {
+        display: grid;
+        gap: 0.35rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+      }
+
+      input,
+      select {
+        font: inherit;
+        padding: 0.55rem 0.65rem;
+        border: 1px solid var(--line);
+        background: #fff;
+        color: var(--ink);
+      }
+
+      .participants {
+        display: grid;
+        gap: 0.75rem;
+      }
+
+      .participant-row {
+        display: grid;
+        grid-template-columns: 1.2fr 1fr 1fr auto;
+        gap: 0.5rem;
+        align-items: end;
+      }
+
+      .participant-row button {
+        height: 2.4rem;
+      }
+
+      .row-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 0.75rem;
+      }
+
+      button {
+        font: inherit;
+        cursor: pointer;
+        border: 1px solid var(--line);
+        background: #fff;
+        padding: 0.5rem 0.85rem;
+      }
+
+      button.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+        font-weight: 600;
+        justify-self: start;
+        padding: 0.65rem 1.2rem;
+      }
+
+      button.primary:hover {
+        filter: brightness(1.05);
+      }
+
+      #status {
+        min-height: 1.25rem;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      #result {
+        margin-top: 1.5rem;
+      }
+
+      .empty {
+        background: var(--danger-bg);
+        color: var(--danger);
+        border: 1px solid #f0c2c2;
+        padding: 1rem 1.1rem;
+        line-height: 1.45;
+      }
+
+      .ranking {
+        display: grid;
+        gap: 0.75rem;
+      }
+
+      .entry {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        padding: 1rem 1.1rem;
+      }
+
+      .entry.recommendation {
+        border-color: var(--accent);
+        background: var(--accent-soft);
+      }
+
+      .entry h2 {
+        margin: 0 0 0.2rem;
+        font-size: 1.05rem;
+      }
+
+      .badge {
+        display: inline-block;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--recommend);
+        margin-bottom: 0.35rem;
+      }
+
+      .meta {
+        color: var(--muted);
+        font-size: 0.9rem;
+        margin: 0 0 0.6rem;
+      }
+
+      .distances {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem 1rem;
+        font-size: 0.9rem;
+      }
+
+      @media (max-width: 720px) {
+        .participant-row,
+        .row-2 {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Serif:wght@600&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <main>
+      <h1>MeetingSearch</h1>
+      <p class="lede">
+        Submit resolved Participants, a Brand, and a Proximity objective to rank
+        Branches. Uses a fake MapProvider locally — no 高德 key required.
+      </p>
+
+      <form id="search-form">
+        <div class="participants" id="participants"></div>
+        <button type="button" id="add-participant">Add Participant</button>
+
+        <div class="row-2">
+          <label>
+            Brand
+            <input name="brand" value="滨寿司" required />
+          </label>
+          <label>
+            Proximity objective
+            <select name="objective">
+              <option value="total_distance">Total distance</option>
+              <option value="minimax">Minimax</option>
+            </select>
+          </label>
+          <label>
+            Radius (meters, optional)
+            <input
+              name="radiusMeters"
+              type="number"
+              min="1"
+              placeholder="15000 (default)"
+            />
+          </label>
+        </div>
+
+        <button class="primary" type="submit">Search</button>
+        <div id="status"></div>
+      </form>
+
+      <div id="result"></div>
+    </main>
+
+    <script>
+      const presets = [
+        { label: "Haidian", lat: 39.98, lng: 116.32 },
+        { label: "Wangjing", lat: 39.99, lng: 116.47 },
+        { label: "Chaoyang", lat: 39.92, lng: 116.45 },
+      ];
+
+      const participantsEl = document.getElementById("participants");
+      const form = document.getElementById("search-form");
+      const resultEl = document.getElementById("result");
+      const statusEl = document.getElementById("status");
+
+      function addParticipantRow(preset) {
+        const row = document.createElement("div");
+        row.className = "participant-row";
+        row.innerHTML = `
+          <label>Label
+            <input name="label" value="${preset?.label ?? ""}" required />
+          </label>
+          <label>Latitude
+            <input name="lat" type="number" step="any" value="${preset?.lat ?? ""}" required />
+          </label>
+          <label>Longitude
+            <input name="lng" type="number" step="any" value="${preset?.lng ?? ""}" required />
+          </label>
+          <button type="button" class="remove">Remove</button>
+        `;
+        row.querySelector(".remove").addEventListener("click", () => {
+          if (participantsEl.children.length <= 2) {
+            statusEl.textContent = "At least two Participants are required.";
+            return;
+          }
+          row.remove();
+        });
+        participantsEl.appendChild(row);
+      }
+
+      addParticipantRow(presets[0]);
+      addParticipantRow(presets[1]);
+
+      document.getElementById("add-participant").addEventListener("click", () => {
+        const next = presets[participantsEl.children.length] ?? {
+          label: `Participant ${participantsEl.children.length + 1}`,
+          lat: 39.9,
+          lng: 116.4,
+        };
+        addParticipantRow(next);
+      });
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        statusEl.textContent = "Searching…";
+        resultEl.innerHTML = "";
+
+        const rows = [...participantsEl.querySelectorAll(".participant-row")];
+        const participants = rows.map((row, i) => ({
+          id: `p${i + 1}`,
+          label: row.querySelector('[name="label"]').value,
+          coordinates: {
+            lat: Number(row.querySelector('[name="lat"]').value),
+            lng: Number(row.querySelector('[name="lng"]').value),
+          },
+        }));
+
+        const fd = new FormData(form);
+        const radiusRaw = fd.get("radiusMeters");
+        const payload = {
+          participants,
+          brand: fd.get("brand"),
+          objective: fd.get("objective"),
+        };
+        if (radiusRaw && String(radiusRaw).trim() !== "") {
+          payload.radiusMeters = Number(radiusRaw);
+        }
+
+        try {
+          const res = await fetch("/api/search", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const data = await res.json();
+
+          if (data.kind === "empty_candidate_set") {
+            statusEl.textContent = "";
+            resultEl.innerHTML = `<div class="empty">${escapeHtml(data.message)}</div>`;
+            return;
+          }
+
+          if (!res.ok) {
+            statusEl.textContent = data.error ?? "Search failed";
+            return;
+          }
+
+          statusEl.textContent = "";
+          resultEl.innerHTML = renderRanking(data);
+        } catch (err) {
+          statusEl.textContent = err.message ?? String(err);
+        }
+      });
+
+      function renderRanking(data) {
+        const objectiveLabel =
+          data.objective === "minimax" ? "minimax (max Distance)" : "total distance (sum)";
+        const entries = data.entries
+          .map((entry, index) => {
+            const isTop = index === 0;
+            const distances = Object.entries(entry.distances)
+              .map(
+                ([id, meters]) =>
+                  `<li><strong>${escapeHtml(id)}</strong>: ${meters.toLocaleString()} m</li>`,
+              )
+              .join("");
+            return `
+              <article class="entry ${isTop ? "recommendation" : ""}">
+                ${isTop ? '<div class="badge">Recommendation</div>' : ""}
+                <h2>${escapeHtml(entry.branch.name)}</h2>
+                <p class="meta">${escapeHtml(entry.branch.address)} · score ${entry.score.toLocaleString()} m (${escapeHtml(objectiveLabel)})</p>
+                <ul class="distances">${distances}</ul>
+              </article>
+            `;
+          })
+          .join("");
+        return `<div class="ranking">${entries}</div>`;
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;");
+      }
+    </script>
+  </body>
+</html>

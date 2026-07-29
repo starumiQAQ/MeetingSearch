@@ -9,9 +9,17 @@ import { isEmptyCandidateSet, isMapProviderError } from "./types.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PORT = Number(process.env.PORT ?? 3000);
 
+export type MapUiConfig = {
+  /** 高德 Web 端 (JS API) key — injected into the page for map display. */
+  jsKey?: string;
+  /** JS API securityJsCode (required for keys created after 2021-12-02). */
+  securityJsCode?: string;
+};
+
 export type AppDeps = {
   mapProvider: MapProvider;
   port?: number;
+  mapUi?: MapUiConfig;
 };
 
 export function createApp(deps: AppDeps) {
@@ -25,7 +33,7 @@ export function createApp(deps: AppDeps) {
       );
 
       if (req.method === "GET" && url.pathname === "/") {
-        await serveForm(res);
+        await serveForm(res, deps.mapUi);
         return;
       }
 
@@ -88,9 +96,17 @@ function writeMapProviderFailure(res: ServerResponse, message: string): void {
   );
 }
 
-async function serveForm(res: ServerResponse): Promise<void> {
+async function serveForm(
+  res: ServerResponse,
+  mapUi?: MapUiConfig,
+): Promise<void> {
   const htmlPath = join(__dirname, "public", "index.html");
-  const html = await readFile(htmlPath, "utf8");
+  let html = await readFile(htmlPath, "utf8");
+  const configJson = JSON.stringify({
+    jsKey: mapUi?.jsKey?.trim() ?? "",
+    securityJsCode: mapUi?.securityJsCode?.trim() ?? "",
+  });
+  html = html.replace("/*__MAP_UI_CONFIG__*/null", configJson);
   res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
   res.end(html);
 }

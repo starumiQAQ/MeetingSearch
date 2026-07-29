@@ -307,3 +307,40 @@ describe("POST /api/search MapProvider failures", () => {
     expect(body.message).toMatch(/高德|INVALID_USER_KEY/);
   });
 });
+
+describe("GET / map UI config injection", () => {
+  const map = new FakeMapProvider({
+    branchesByBrand: { 滨寿司: [branch] },
+  });
+  const app = createApp({
+    mapProvider: map,
+    port: 0,
+    mapUi: {
+      jsKey: "test-js-key",
+      securityJsCode: "test-security",
+    },
+  });
+  let baseUrl = "";
+
+  beforeAll(async () => {
+    await app.start();
+    const address = app.server.address();
+    if (!address || typeof address === "string") {
+      throw new Error("expected TCP address");
+    }
+    baseUrl = `http://127.0.0.1:${address.port}`;
+  });
+
+  afterAll(async () => {
+    await app.stop();
+  });
+
+  it("injects MapUiConfig into the page without leaving the placeholder", async () => {
+    const res = await fetch(`${baseUrl}/`);
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).not.toContain("/*__MAP_UI_CONFIG__*/null");
+    expect(html).toContain('"jsKey":"test-js-key"');
+    expect(html).toContain('"securityJsCode":"test-security"');
+  });
+});

@@ -1,0 +1,3 @@
+# Show Participants and Branches on a browser 高德 map
+
+The local web UI (ADR-0002) stays form-driven for search, but results feel incomplete without spatial context. We embed the 高德 JS map in the browser to plot resolved Participants and top Ranking Branches (display and disambiguation picking only). Geocoding, Candidate set, Distances, and Ranking still run on the server via existing APIs — the map must not become a second source of truth for Distance (no path polylines that could be mistaken for crow-fly). Rejected: list-only polish, and a “map feel” panel without a real SDK — both keep the product looking unfinished next to map-first peers.

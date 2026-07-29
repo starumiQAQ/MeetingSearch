@@ -8,6 +8,9 @@ loadEnvFile();
 
 const PORT = Number(process.env.PORT ?? 3000);
 const amapKey = process.env.AMAP_KEY?.trim();
+const amapJsKey =
+  process.env.AMAP_JS_KEY?.trim() || amapKey || "";
+const amapSecurityJsCode = process.env.AMAP_SECURITY_JS_CODE?.trim() || "";
 const amapQps = parseQps(
   process.env.AMAP_QPS ?? process.env.AMAP_CONCURRENCY,
   DEFAULT_AMAP_QPS,
@@ -23,6 +26,10 @@ const mapProvider: MapProvider = amapKey
 const app = createApp({
   mapProvider,
   port: PORT,
+  mapUi: {
+    jsKey: amapJsKey,
+    securityJsCode: amapSecurityJsCode,
+  },
 });
 
 await app.start();
@@ -36,6 +43,15 @@ if (amapKey) {
 } else {
   console.log(
     "MapProvider: demo fake (set AMAP_KEY in .env for live 高德)",
+  );
+}
+if (amapJsKey) {
+  console.log(
+    `Map UI: 高德 JS API key present${amapSecurityJsCode ? " (securityJsCode set)" : " (no AMAP_SECURITY_JS_CODE)"}`,
+  );
+} else {
+  console.log(
+    "Map UI: no AMAP_JS_KEY / AMAP_KEY — browser map disabled; search still works",
   );
 }
 

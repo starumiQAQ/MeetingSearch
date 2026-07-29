@@ -10,7 +10,7 @@ cp .env.example .env   # then set AMAP_KEY
 npm start
 ```
 
-Open http://localhost:3000 — enter free-text Participant addresses. The page geocodes via `POST /api/geocode` (unique hits apply automatically; ambiguous matches need a choice) and then posts resolved coordinates to `POST /api/search`. Map calls run **server-side** only; the browser never sees `AMAP_KEY`.
+Open http://localhost:3000 — enter free-text Participant addresses. The page geocodes via `POST /api/geocode` (unique hits apply automatically; ambiguous matches need a choice) and then posts resolved coordinates to `POST /api/search`. Ranking, Distances, and Candidate set still run **server-side**. The browser embeds a 高德 JS map for display (Participants / top Branches / disambiguation picks) when a JS key is configured (ADR-0003).
 
 ### MapProvider
 
@@ -19,8 +19,10 @@ Open http://localhost:3000 — enter free-text Participant addresses. The page g
 | `AMAP_KEY` set in env or `.env` | Live 高德 `AmapMapProvider` (geocode, Branch POI, driving Distance) |
 | Key missing / empty | Demo fake MapProvider (no network; sample 滨寿司 Branches) |
 | `AMAP_QPS` (optional) | 高德 HTTP **次/秒** 上限；默认 **3**（不是同时在途数） |
+| `AMAP_JS_KEY` (optional) | Web 端 JS API key for the browser map; falls back to `AMAP_KEY` if unset |
+| `AMAP_SECURITY_JS_CODE` (optional) | JS API `securityJsCode` (needed for keys created after 2021-12-02) |
 
-`.env` is gitignored. Commit only `.env.example` (empty key placeholder).
+`.env` is gitignored. Commit only `.env.example` (empty key placeholders). Restrict the JS key with a domain whitelist in the 高德 console — it is injected into the page.
 
 `POST /api/search` 仍可传 `"concurrency"` 控制 MeetingSearch 侧并行调度；真正打高德的频率由 `AMAP_QPS` 闸住。
 

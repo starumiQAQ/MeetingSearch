@@ -145,6 +145,18 @@
         line-height: 1.45;
       }
 
+      .empty p {
+        margin: 0 0 0.65rem;
+      }
+
+      .empty p:last-child {
+        margin-bottom: 0;
+      }
+
+      .empty .hint {
+        color: var(--muted);
+      }
+
       .disambiguation {
         background: var(--panel);
         border: 1px solid var(--line);
@@ -254,8 +266,9 @@
       <p class="lede">
         Enter Participant addresses as free text. Unique geocode hits apply
         automatically; ambiguous matches need a choice before Ranking runs.
-        Map calls run on the server (高德 when <code>AMAP_KEY</code> is set;
-        otherwise a demo fake).
+        After a search, change Proximity objective or radius and search again
+        without re-entering addresses. Map calls run on the server (高德 when
+        <code>AMAP_KEY</code> is set; otherwise a demo fake).
       </p>
       <p class="hint">
         Demo addresses: 「海淀区中关村」 (unique), 「望京」 (ambiguous),
@@ -311,6 +324,30 @@
 
       /** Pending disambiguation: index → { label, address, candidates, selectedIndex? } */
       let pendingAmbiguous = null;
+      /** Last geocoded Participants + fingerprint of label/address rows. */
+      let lastResolved = null;
+
+      function readParticipantDrafts() {
+        const rows = [...participantsEl.querySelectorAll(".participant-row")];
+        return rows.map((row, i) => ({
+          id: `p${i + 1}`,
+          label: row.querySelector('[name="label"]').value.trim(),
+          address: row.querySelector('[name="address"]').value.trim(),
+        }));
+      }
+
+      function participantFingerprint(drafts) {
+        // Address rows only — label renames must not force re-geocode.
+        return drafts.map((d) => `${d.id}\0${d.address}`).join("\n");
+      }
+
+      function clearResolvedCache() {
+        lastResolved = null;
+      }
+
+      function rememberResolved(participants, fingerprint) {
+        lastResolved = { participants, fingerprint };
+      }
 
       function addParticipantRow(preset) {
         const row = document.createElement("div");
@@ -331,7 +368,9 @@
           }
           row.remove();
           clearDisambiguation();
+          clearResolvedCache();
         });
+        row.querySelector('[name="address"]').addEventListener("input", clearResolvedCache);
         participantsEl.appendChild(row);
       }
 
@@ -345,29 +384,43 @@
         };
         addParticipantRow(next);
         clearDisambiguation();
+        clearResolvedCache();
       });
 
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
         clearDisambiguation();
-        statusEl.textContent = "Geocoding addresses…";
         resultEl.innerHTML = "";
         searchButton.disabled = true;
 
-        const rows = [...participantsEl.querySelectorAll(".participant-row")];
-        if (rows.length < 2) {
+        const drafts = readParticipantDrafts();
+        if (drafts.length < 2) {
           statusEl.textContent = "At least two Participants are required.";
           searchButton.disabled = false;
           return;
         }
 
-        try {
-          const drafts = rows.map((row, i) => ({
-            id: `p${i + 1}`,
-            label: row.querySelector('[name="label"]').value.trim(),
-            address: row.querySelector('[name="address"]').value.trim(),
+        const fingerprint = participantFingerprint(drafts);
+        if (
+          lastResolved &&
+          lastResolved.fingerprint === fingerprint &&
+          lastResolved.participants.length === drafts.length
+        ) {
+          // Re-rank / re-search with cached coords (objective, radius, or Brand changed).
+          const refreshed = lastResolved.participants.map((p, i) => ({
+            ...p,
+            id: drafts[i].id,
+            label: drafts[i].label,
           }));
+          rememberResolved(refreshed, fingerprint);
+          statusEl.textContent = "Searching with saved Participant locations…";
+          await runSearch(refreshed);
+          return;
+        }
 
+        statusEl.textContent = "Geocoding addresses…";
+
+        try {
           const geocoded = [];
           const ambiguous = [];
 
@@ -406,7 +459,7 @@
           }
 
           if (ambiguous.length > 0) {
-            pendingAmbiguous = { resolved: geocoded, ambiguous };
+            pendingAmbiguous = { resolved: geocoded, ambiguous, fingerprint };
             statusEl.textContent =
               "Choose a match for each ambiguous address before searching.";
             resultEl.innerHTML = renderDisambiguation(ambiguous);
@@ -414,6 +467,7 @@
             return;
           }
 
+          rememberResolved(geocoded, fingerprint);
           await runSearch(geocoded);
         } catch (err) {
           statusEl.textContent = err.message ?? String(err);
@@ -510,8 +564,10 @@
         // Keep original form order by id (p1, p2, …).
         participants.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
 
+        const fingerprint = pendingAmbiguous.fingerprint;
         clearDisambiguation();
         resultEl.innerHTML = "";
+        rememberResolved(participants, fingerprint);
         await runSearch(participants);
       });
 
@@ -544,7 +600,7 @@
 
           if (data.kind === "empty_candidate_set") {
             statusEl.textContent = "";
-            resultEl.innerHTML = `<div class="empty">${escapeHtml(data.message)}</div>`;
+            resultEl.innerHTML = renderEmptyCandidateSet(data.message);
             return;
           }
 
@@ -559,7 +615,7 @@
           }
 
           statusEl.textContent = "";
-          resultEl.innerHTML = renderRanking(data);
+          resultEl.innerHTML = renderRanking(data, participants);
         } catch (err) {
           statusEl.textContent = err.message ?? String(err);
         } finally {
@@ -567,17 +623,37 @@
         }
       }
 
-      function renderRanking(data) {
+      function renderEmptyCandidateSet(message) {
+        return `
+          <div class="empty">
+            <p>${escapeHtml(message)}</p>
+            <p class="hint">
+              Increase the radius or change the Brand above, then search again
+              to recover from an Empty candidate set.
+            </p>
+          </div>`;
+      }
+
+      function labelById(participants) {
+        const map = Object.create(null);
+        for (const p of participants) {
+          map[p.id] = p.label || p.id;
+        }
+        return map;
+      }
+
+      function renderRanking(data, participants) {
+        const labels = labelById(participants ?? lastResolved?.participants ?? []);
         const objectiveLabel =
           data.objective === "minimax" ? "minimax (max Distance)" : "total distance (sum)";
         const entries = data.entries
           .map((entry, index) => {
             const isTop = index === 0;
             const distances = Object.entries(entry.distances)
-              .map(
-                ([id, meters]) =>
-                  `<li><strong>${escapeHtml(id)}</strong>: ${meters.toLocaleString()} m</li>`,
-              )
+              .map(([id, meters]) => {
+                const name = labels[id] ?? id;
+                return `<li><strong>${escapeHtml(name)}</strong>: ${meters.toLocaleString()} m</li>`;
+              })
               .join("");
             return `
               <article class="entry ${isTop ? "recommendation" : ""}">

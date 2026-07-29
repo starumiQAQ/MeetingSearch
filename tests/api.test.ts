@@ -187,6 +187,23 @@ describe("local web API", () => {
     expect(html).not.toContain('name="lat"');
     expect(html).not.toContain('name="lng"');
   });
+
+  it("serves organizer UX for edit group, re-rank, and Empty candidate set recovery (#5)", async () => {
+    const res = await fetch(`${baseUrl}/`);
+    expect(res.status).toBe(200);
+    const html = await res.text();
+
+    expect(html).toContain("Add Participant");
+    expect(html).toContain('class="remove"');
+    expect(html).toContain('name="objective"');
+    expect(html).toContain('name="radiusMeters"');
+    expect(html).toContain("Recommendation");
+    expect(html).toContain("lastResolved");
+    expect(html).toContain("participantFingerprint");
+    expect(html).toContain("labelById");
+    expect(html).toMatch(/increasing the radius|increase the radius/i);
+    expect(html).toMatch(/changing the Brand|change the Brand/i);
+  });
 });
 
 describe("POST /api/geocode MapProvider failures", () => {

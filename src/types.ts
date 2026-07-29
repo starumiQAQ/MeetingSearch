@@ -40,6 +40,12 @@ export type EmptyCandidateSet = {
   message: string;
 };
 
+/** Distinct from Empty candidate set — MapProvider/API/config failures. */
+export type MapProviderFailure = {
+  kind: "map_provider_error";
+  message: string;
+};
+
 export type MeetingSearchResult = Ranking | EmptyCandidateSet;
 
 export function isEmptyCandidateSet(
@@ -48,11 +54,49 @@ export function isEmptyCandidateSet(
   return "kind" in result && result.kind === "empty_candidate_set";
 }
 
+export function isMapProviderFailure(
+  value: unknown,
+): value is MapProviderFailure {
+  return (
+    !!value &&
+    typeof value === "object" &&
+    "kind" in value &&
+    (value as { kind: unknown }).kind === "map_provider_error"
+  );
+}
+
+/** Thrown by MapProvider adapters; API maps to MapProviderFailure. */
+export class MapProviderError extends Error {
+  readonly kind = "map_provider_error" as const;
+
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "MapProviderError";
+  }
+}
+
+export function isMapProviderError(err: unknown): err is MapProviderError {
+  return err instanceof MapProviderError;
+}
+
+/** One geocoding match: formatted address + coordinates. */
+export type GeocodeCandidate = {
+  formattedAddress: string;
+  coordinates: Coordinates;
+  /** Optional provider POI / place id. */
+  id?: string;
+  /** Optional short name from the provider. */
+  name?: string;
+};
+
 /**
  * Map traffic seam. Injectable so MeetingSearch can run with a fake
  * without live 高德 (ADR 0001 still applies for production adapters).
  */
 export type MapProvider = {
+  /** Resolve free-text address to candidate coordinates. */
+  geocode(address: string): Promise<GeocodeCandidate[]>;
+
   searchBranches(params: {
     brand: string;
     near: Coordinates;

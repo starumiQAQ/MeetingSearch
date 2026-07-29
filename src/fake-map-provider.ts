@@ -1,4 +1,9 @@
-import type { Branch, Coordinates, MapProvider } from "../src/types.js";
+import type {
+  Branch,
+  Coordinates,
+  GeocodeCandidate,
+  MapProvider,
+} from "./types.js";
 
 /**
  * In-memory MapProvider for demos and MeetingSearch seam tests.
@@ -7,6 +12,7 @@ import type { Branch, Coordinates, MapProvider } from "../src/types.js";
 export class FakeMapProvider implements MapProvider {
   private readonly branchesByBrand: Map<string, Branch[]>;
   private readonly distances: Map<string, number>;
+  private readonly geocodeByAddress: Map<string, GeocodeCandidate[]>;
   readonly searchCalls: Array<{
     brand: string;
     near: Coordinates;
@@ -17,11 +23,19 @@ export class FakeMapProvider implements MapProvider {
     branchesByBrand?: Record<string, Branch[]>;
     /** Key: `${fromLat},${fromLng}->${toLat},${toLng}` → meters */
     distances?: Record<string, number>;
+    geocodeByAddress?: Record<string, GeocodeCandidate[]>;
   }) {
     this.branchesByBrand = new Map(
       Object.entries(options?.branchesByBrand ?? {}),
     );
     this.distances = new Map(Object.entries(options?.distances ?? {}));
+    this.geocodeByAddress = new Map(
+      Object.entries(options?.geocodeByAddress ?? {}),
+    );
+  }
+
+  async geocode(address: string): Promise<GeocodeCandidate[]> {
+    return this.geocodeByAddress.get(address) ?? [];
   }
 
   async searchBranches(params: {

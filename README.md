@@ -6,10 +6,20 @@ Local web app that ranks Brand Branches for a group of Participants under a chos
 
 ```bash
 npm install
+cp .env.example .env   # then set AMAP_KEY
 npm start
 ```
 
-Open http://localhost:3000 — the form posts to `POST /api/search`. Map traffic uses an injectable fake MapProvider (no 高德 key needed for this ticket).
+Open http://localhost:3000 — the form posts to `POST /api/search`. Map calls run **server-side** only; the browser never sees `AMAP_KEY`.
+
+### MapProvider
+
+| Config | Behavior |
+|--------|----------|
+| `AMAP_KEY` set in env or `.env` | Live 高德 `AmapMapProvider` (geocode, Branch POI, driving Distance) |
+| Key missing / empty | Demo fake MapProvider (no network; sample 滨寿司 Branches) |
+
+`.env` is gitignored. Commit only `.env.example` (empty key placeholder).
 
 ## API
 
@@ -27,13 +37,23 @@ Open http://localhost:3000 — the form posts to `POST /api/search`. Map traffic
 }
 ```
 
-`radiusMeters` is optional (default 15 km). Response is a Ranking or an Empty candidate set error.
+`radiusMeters` is optional (default 15 km). Responses:
+
+- **200** Ranking
+- **404** `{ "kind": "empty_candidate_set", "message": "..." }` — no Branches in radius
+- **502** `{ "kind": "map_provider_error", "message": "..." }` — key/HTTP/高德 API failure (not an empty Candidate set)
 
 ## Test
 
 ```bash
 npm test
 npm run typecheck
+```
+
+Unit tests mock the HTTP seam for `AmapMapProvider` (no live network). Optional live smoke:
+
+```bash
+AMAP_LIVE=1 npx vitest run tests/amap-live.smoke.test.ts
 ```
 
 MeetingSearch seam tests cover both objectives (including disagreement), Candidate set union/dedupe, Empty candidate set, and default radius.

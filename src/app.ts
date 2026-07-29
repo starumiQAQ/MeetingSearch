@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { meetingSearch } from "./meeting-search.js";
 import type { MapProvider, MeetingSearchInput, ProximityObjective } from "./types.js";
-import { isEmptyCandidateSet } from "./types.js";
+import { isEmptyCandidateSet, isMapProviderError } from "./types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PORT = Number(process.env.PORT ?? 3000);
@@ -37,6 +37,10 @@ export function createApp(deps: AppDeps) {
       res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
       res.end("Not found");
     } catch (err) {
+      if (isMapProviderError(err)) {
+        writeMapProviderFailure(res, err.message);
+        return;
+      }
       const message = err instanceof Error ? err.message : String(err);
       res.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
       res.end(JSON.stringify({ error: message }));
@@ -59,6 +63,16 @@ export function createApp(deps: AppDeps) {
   };
 }
 
+function writeMapProviderFailure(res: ServerResponse, message: string): void {
+  res.writeHead(502, { "Content-Type": "application/json; charset=utf-8" });
+  res.end(
+    JSON.stringify({
+      kind: "map_provider_error",
+      message,
+    }),
+  );
+}
+
 async function serveForm(res: ServerResponse): Promise<void> {
   const htmlPath = join(__dirname, "public", "index.html");
   const html = await readFile(htmlPath, "utf8");
@@ -73,7 +87,17 @@ async function handleSearch(
 ): Promise<void> {
   const body = await readJsonBody(req);
   const input = parseSearchInput(body);
-  const result = await meetingSearch(input, map);
+
+  let result;
+  try {
+    result = await meetingSearch(input, map);
+  } catch (err) {
+    if (isMapProviderError(err)) {
+      writeMapProviderFailure(res, err.message);
+      return;
+    }
+    throw err;
+  }
 
   if (isEmptyCandidateSet(result)) {
     res.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });

@@ -1,4 +1,6 @@
+import { mapPool } from "./concurrency.js";
 import {
+  DEFAULT_AMAP_CONCURRENCY,
   DEFAULT_RADIUS_METERS,
   type Branch,
   type Coordinates,
@@ -11,6 +13,7 @@ import {
 /**
  * MeetingSearch seam: build the Candidate set via MapProvider, score by
  * Proximity objective, return a Ranking or Empty candidate set error.
+ * Map calls run with bounded concurrency (default 3).
  */
 export async function meetingSearch(
   input: MeetingSearchInput,
@@ -21,17 +24,17 @@ export async function meetingSearch(
   }
 
   const radiusMeters = input.radiusMeters ?? DEFAULT_RADIUS_METERS;
+  const concurrency = input.concurrency ?? DEFAULT_AMAP_CONCURRENCY;
   const centers = searchCenters(input.participants.map((p) => p.coordinates));
 
-  const found: Branch[] = [];
-  for (const near of centers) {
-    const batch = await map.searchBranches({
+  const batches = await mapPool(centers, concurrency, (near) =>
+    map.searchBranches({
       brand: input.brand,
       near,
       radiusMeters,
-    });
-    found.push(...batch);
-  }
+    }),
+  );
+  const found: Branch[] = batches.flat();
 
   const candidates = dedupeBranches(found);
   if (candidates.length === 0) {
@@ -42,22 +45,32 @@ export async function meetingSearch(
     };
   }
 
-  const entries: RankingEntry[] = [];
-  for (const branch of candidates) {
+  const pairJobs = candidates.flatMap((branch) =>
+    input.participants.map((participant) => ({ branch, participant })),
+  );
+  const pairDistances = await mapPool(pairJobs, concurrency, ({ branch, participant }) =>
+    map.drivingDistance(participant.coordinates, branch.coordinates),
+  );
+
+  const distanceByKey = new Map<string, number>();
+  for (const [i, job] of pairJobs.entries()) {
+    distanceByKey.set(`${job.branch.id}:${job.participant.id}`, pairDistances[i]!);
+  }
+
+  const entries: RankingEntry[] = candidates.map((branch) => {
     const distances: Record<string, number> = {};
     for (const participant of input.participants) {
-      distances[participant.id] = await map.drivingDistance(
-        participant.coordinates,
-        branch.coordinates,
-      );
+      distances[participant.id] = distanceByKey.get(
+        `${branch.id}:${participant.id}`,
+      )!;
     }
     const values = Object.values(distances);
     const score =
       input.objective === "total_distance"
         ? values.reduce((sum, d) => sum + d, 0)
         : Math.max(...values);
-    entries.push({ branch, distances, score });
-  }
+    return { branch, distances, score };
+  });
 
   entries.sort((a, b) => {
     if (a.score !== b.score) return a.score - b.score;

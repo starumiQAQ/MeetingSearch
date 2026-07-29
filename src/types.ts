@@ -120,6 +120,17 @@ export type MeetingSearchInput = {
   objective: ProximityObjective;
   /** Search radius in meters. Default 15 km when omitted. */
   radiusMeters?: number;
+  /**
+   * Max concurrent MapProvider calls during Candidate set + Distance scoring.
+   * Default 3. Independent of 高德 QPS (次/秒) which is enforced on AmapMapProvider.
+   */
+  concurrency?: number;
 };
 
 export const DEFAULT_RADIUS_METERS = 15_000;
+
+/** Default 高德 HTTP rate: 3 次/秒 (personal Web 服务 key). */
+export const DEFAULT_AMAP_QPS = 3;
+
+/** @deprecated Use DEFAULT_AMAP_QPS — kept as alias for older call sites. */
+export const DEFAULT_AMAP_CONCURRENCY = DEFAULT_AMAP_QPS;

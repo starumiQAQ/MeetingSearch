@@ -221,5 +221,17 @@ function parseSearchInput(body: unknown): MeetingSearchInput {
     input.radiusMeters = radius;
   }
 
+  if (
+    o.concurrency !== undefined &&
+    o.concurrency !== null &&
+    o.concurrency !== ""
+  ) {
+    const concurrency = Number(o.concurrency);
+    if (!Number.isInteger(concurrency) || concurrency < 1) {
+      throw new Error("concurrency must be a positive integer");
+    }
+    input.concurrency = concurrency;
+  }
+
   return input;
 }

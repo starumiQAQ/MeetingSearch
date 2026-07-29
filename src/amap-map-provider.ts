@@ -1,4 +1,6 @@
+import { createQpsGate } from "./concurrency.js";
 import {
+  DEFAULT_AMAP_QPS,
   MapProviderError,
   type Branch,
   type Coordinates,
@@ -17,6 +19,13 @@ export type AmapMapProviderOptions = {
   fetch?: AmapFetch;
   /** Override REST base for tests. Default https://restapi.amap.com */
   baseUrl?: string;
+  /**
+   * Max 高德 HTTP starts per second (次/秒). Default 3.
+   * Personal keys reject bursts with CUQPS_HAS_EXCEEDED_THE_LIMIT.
+   */
+  qps?: number;
+  /** @deprecated Use `qps` (次/秒). */
+  concurrency?: number;
 };
 
 /**
@@ -26,6 +35,7 @@ export class AmapMapProvider implements MapProvider {
   private readonly apiKey: string;
   private readonly fetch: AmapFetch;
   private readonly baseUrl: string;
+  private readonly runExclusive: <T>(fn: () => Promise<T>) => Promise<T>;
 
   constructor(options: AmapMapProviderOptions) {
     if (!options.apiKey?.trim()) {
@@ -37,6 +47,8 @@ export class AmapMapProvider implements MapProvider {
       /\/$/,
       "",
     );
+    const qps = options.qps ?? options.concurrency ?? DEFAULT_AMAP_QPS;
+    this.runExclusive = createQpsGate(qps);
   }
 
   async geocode(address: string): Promise<GeocodeCandidate[]> {
@@ -122,35 +134,37 @@ export class AmapMapProvider implements MapProvider {
   }
 
   private async getJson(url: URL): Promise<Record<string, unknown>> {
-    let response: Response;
-    try {
-      response = await this.fetch(url.toString());
-    } catch (err) {
-      throw new MapProviderError(
-        `高德 request failed: ${err instanceof Error ? err.message : String(err)}`,
-        { cause: err },
-      );
-    }
+    return this.runExclusive(async () => {
+      let response: Response;
+      try {
+        response = await this.fetch(url.toString());
+      } catch (err) {
+        throw new MapProviderError(
+          `高德 request failed: ${err instanceof Error ? err.message : String(err)}`,
+          { cause: err },
+        );
+      }
 
-    if (!response.ok) {
-      throw new MapProviderError(
-        `高德 HTTP ${response.status} for ${url.pathname}`,
-      );
-    }
+      if (!response.ok) {
+        throw new MapProviderError(
+          `高德 HTTP ${response.status} for ${url.pathname}`,
+        );
+      }
 
-    let data: Record<string, unknown>;
-    try {
-      data = (await response.json()) as Record<string, unknown>;
-    } catch (err) {
-      throw new MapProviderError("高德 response is not JSON", { cause: err });
-    }
+      let data: Record<string, unknown>;
+      try {
+        data = (await response.json()) as Record<string, unknown>;
+      } catch (err) {
+        throw new MapProviderError("高德 response is not JSON", { cause: err });
+      }
 
-    if (String(data.status) !== "1") {
-      const info = String(data.info ?? data.infocode ?? "unknown");
-      throw new MapProviderError(`高德 API error: ${info}`);
-    }
+      if (String(data.status) !== "1") {
+        const info = String(data.info ?? data.infocode ?? "unknown");
+        throw new MapProviderError(`高德 API error: ${info}`);
+      }
 
-    return data;
+      return data;
+    });
   }
 }
 

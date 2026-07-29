@@ -182,8 +182,53 @@ describe("local web API", () => {
     expect(html).toContain('name="address"');
     expect(html).toContain("/api/geocode");
     expect(html).toContain("/api/search");
+    expect(html).toContain("map_provider_error");
+    expect(html).toContain("empty_candidate_set");
     expect(html).not.toContain('name="lat"');
     expect(html).not.toContain('name="lng"');
+  });
+});
+
+describe("POST /api/geocode MapProvider failures", () => {
+  const failingMap: MapProvider = {
+    async geocode() {
+      throw new MapProviderError("高德 API error: INVALID_USER_KEY");
+    },
+    async searchBranches() {
+      throw new MapProviderError("高德 API error: INVALID_USER_KEY");
+    },
+    async drivingDistance() {
+      throw new MapProviderError("高德 API error: INVALID_USER_KEY");
+    },
+  };
+
+  const app = createApp({ mapProvider: failingMap, port: 0 });
+  let baseUrl = "";
+
+  beforeAll(async () => {
+    await app.start();
+    const address = app.server.address();
+    if (!address || typeof address === "string") {
+      throw new Error("expected TCP address");
+    }
+    baseUrl = `http://127.0.0.1:${address.port}`;
+  });
+
+  afterAll(async () => {
+    await app.stop();
+  });
+
+  it("returns map_provider_error for geocode failures", async () => {
+    const res = await fetch(`${baseUrl}/api/geocode`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ address: "望京" }),
+    });
+
+    expect(res.status).toBe(502);
+    const body = await res.json();
+    expect(body.kind).toBe("map_provider_error");
+    expect(body.message).toMatch(/高德|INVALID_USER_KEY/);
   });
 });
 

@@ -379,7 +379,7 @@
             });
             const data = await res.json();
             if (!res.ok) {
-              throw new Error(data.error ?? "Geocode failed");
+              throw new Error(apiFailureMessage(data, "Geocode failed"));
             }
             const candidates = data.candidates ?? [];
             if (candidates.length === 0) {
@@ -548,8 +548,13 @@
             return;
           }
 
+          if (data.kind === "map_provider_error") {
+            statusEl.textContent = data.message ?? "Map provider error";
+            return;
+          }
+
           if (!res.ok) {
-            statusEl.textContent = data.error ?? "Search failed";
+            statusEl.textContent = apiFailureMessage(data, "Search failed");
             return;
           }
 
@@ -585,6 +590,19 @@
           })
           .join("");
         return `<div class="ranking">${entries}</div>`;
+      }
+
+      function apiFailureMessage(data, fallback) {
+        if (data && data.kind === "map_provider_error" && data.message) {
+          return data.message;
+        }
+        if (data && typeof data.message === "string" && data.message) {
+          return data.message;
+        }
+        if (data && typeof data.error === "string" && data.error) {
+          return data.error;
+        }
+        return fallback;
       }
 
       function escapeHtml(value) {

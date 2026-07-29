@@ -254,7 +254,8 @@
       <p class="lede">
         Enter Participant addresses as free text. Unique geocode hits apply
         automatically; ambiguous matches need a choice before Ranking runs.
-        Uses a fake MapProvider locally — no 高德 key required.
+        Map calls run on the server (高德 when <code>AMAP_KEY</code> is set;
+        otherwise a demo fake).
       </p>
       <p class="hint">
         Demo addresses: 「海淀区中关村」 (unique), 「望京」 (ambiguous),

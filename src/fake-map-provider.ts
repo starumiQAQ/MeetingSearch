@@ -3,7 +3,7 @@ import type {
   Coordinates,
   GeocodeCandidate,
   MapProvider,
-} from "../src/types.js";
+} from "./types.js";
 
 /**
  * In-memory MapProvider for demos and MeetingSearch seam tests.
@@ -76,6 +76,8 @@ export class FakeMapProvider implements MapProvider {
     return candidates.map((c) => ({
       formattedAddress: c.formattedAddress,
       coordinates: { ...c.coordinates },
+      ...(c.id !== undefined ? { id: c.id } : {}),
+      ...(c.name !== undefined ? { name: c.name } : {}),
     }));
   }
 

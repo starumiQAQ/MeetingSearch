@@ -9,9 +9,17 @@ npm install
 npm start
 ```
 
-Open http://localhost:3000 — the form posts to `POST /api/search`. Map traffic uses an injectable fake MapProvider (no 高德 key needed for this ticket).
+Open http://localhost:3000 — enter free-text Participant addresses. The page geocodes via `POST /api/geocode` (unique hits apply automatically; ambiguous matches need a choice) and then posts resolved coordinates to `POST /api/search`. Map traffic uses an injectable fake MapProvider (no 高德 key needed for this ticket).
 
 ## API
+
+`POST /api/geocode`
+
+```json
+{ "address": "望京" }
+```
+
+Response: `{ "candidates": [ { "formattedAddress": "...", "coordinates": { "lat": 39.99, "lng": 116.47 } } ] }` — zero, one, or many candidates.
 
 `POST /api/search`
 
@@ -36,4 +44,4 @@ npm test
 npm run typecheck
 ```
 
-MeetingSearch seam tests cover both objectives (including disagreement), Candidate set union/dedupe, Empty candidate set, and default radius.
+MeetingSearch seam tests cover both objectives (including disagreement), Candidate set union/dedupe, Empty candidate set, and default radius. Geocode seam tests cover unique / ambiguous / empty hits and `POST /api/geocode`.

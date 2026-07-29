@@ -54,9 +54,9 @@ const chaoyang: GeocodeCandidate = {
  * "望京" is intentionally ambiguous so organizers can exercise disambiguation.
  */
 export const DEMO_ADDRESS_PRESETS = [
-  { label: "Haidian", address: "中关村" },
+  { label: "Haidian", address: "海淀区中关村" },
   { label: "Wangjing", address: "望京" },
-  { label: "Chaoyang", address: "三里屯" },
+  { label: "Chaoyang", address: "朝阳区三里屯" },
 ] as const;
 
 /** Resolved coordinates used to script driving Distances for unique hits. */
@@ -70,11 +70,11 @@ export function createDemoMapProvider(): FakeMapProvider {
   const map = new FakeMapProvider({
     branchesByBrand: { 滨寿司: demoBranches },
     geocodeResults: {
+      海淀区中关村: [haidian],
       中关村: [haidian],
       望京: [wangjingStreet, wangjingXiyuan],
+      朝阳区三里屯: [chaoyang],
       三里屯: [chaoyang],
-      海淀: [haidian],
-      朝阳: [chaoyang],
     },
   });
 

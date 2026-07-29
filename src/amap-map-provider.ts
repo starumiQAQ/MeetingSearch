@@ -46,18 +46,21 @@ export class AmapMapProvider implements MapProvider {
 
     const data = await this.getJson(url);
     const geocodes = Array.isArray(data.geocodes) ? data.geocodes : [];
-    return geocodes.map((row) => {
+    const candidates: GeocodeCandidate[] = [];
+    for (const row of geocodes) {
       const g = row as Record<string, unknown>;
-      const location = String(g.location ?? "");
-      const coordinates = parseLngLat(location);
+      const formattedAddress = String(g.formatted_address ?? "").trim();
+      const location = String(g.location ?? "").trim();
+      if (!formattedAddress || !location) continue;
       const candidate: GeocodeCandidate = {
-        formattedAddress: String(g.formatted_address ?? ""),
-        coordinates,
+        formattedAddress,
+        coordinates: parseLngLat(location),
       };
       if (typeof g.name === "string" && g.name) candidate.name = g.name;
       if (typeof g.id === "string" && g.id) candidate.id = g.id;
-      return candidate;
-    });
+      candidates.push(candidate);
+    }
+    return candidates;
   }
 
   async searchBranches(params: {
@@ -76,15 +79,21 @@ export class AmapMapProvider implements MapProvider {
 
     const data = await this.getJson(url);
     const pois = Array.isArray(data.pois) ? data.pois : [];
-    return pois.map((row) => {
+    const branches: Branch[] = [];
+    for (const row of pois) {
       const p = row as Record<string, unknown>;
-      return {
-        id: String(p.id ?? ""),
-        name: String(p.name ?? ""),
-        address: String(p.address ?? ""),
-        coordinates: parseLngLat(String(p.location ?? "")),
-      };
-    });
+      const id = String(p.id ?? "").trim();
+      const name = String(p.name ?? "").trim();
+      const location = String(p.location ?? "").trim();
+      if (!id || !name || !location) continue;
+      branches.push({
+        id,
+        name,
+        address: String(p.address ?? "").trim() || name,
+        coordinates: parseLngLat(location),
+      });
+    }
+    return branches;
   }
 
   async drivingDistance(

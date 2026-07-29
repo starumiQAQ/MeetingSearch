@@ -49,6 +49,15 @@ export function isEmptyCandidateSet(
 }
 
 /**
+ * One plausible match from geocoding a free-text address.
+ * When multiple are returned, the organizer must pick one before search.
+ */
+export type GeocodeCandidate = {
+  formattedAddress: string;
+  coordinates: Coordinates;
+};
+
+/**
  * Map traffic seam. Injectable so MeetingSearch can run with a fake
  * without live 高德 (ADR 0001 still applies for production adapters).
  */
@@ -61,6 +70,13 @@ export type MapProvider = {
 
   /** Driving route length in meters. */
   drivingDistance(from: Coordinates, to: Coordinates): Promise<number>;
+
+  /**
+   * Resolve a free-text address to zero, one, or many candidates.
+   * Unique hit → auto-accept; multiple → organizer must disambiguate;
+   * empty → clear error before MeetingSearch.
+   */
+  geocode(address: string): Promise<GeocodeCandidate[]>;
 };
 
 export type MeetingSearchInput = {

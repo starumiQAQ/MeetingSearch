@@ -10,4 +10,5 @@ const app = createApp({
 
 await app.start();
 console.log(`MeetingSearch local web UI: http://localhost:${app.port}`);
+console.log(`API: POST http://localhost:${app.port}/api/geocode`);
 console.log(`API: POST http://localhost:${app.port}/api/search`);

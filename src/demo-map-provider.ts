@@ -1,5 +1,5 @@
 import { FakeMapProvider } from "./fake-map-provider.js";
-import type { Branch } from "./types.js";
+import type { Branch, GeocodeCandidate } from "./types.js";
 
 /** Demo Branches around a Beijing sample area for the local web UI. */
 const demoBranches: Branch[] = [
@@ -29,36 +29,76 @@ const demoBranches: Branch[] = [
   },
 ];
 
-/** Form preset coordinates — Distances are scripted for these points only. */
-export const DEMO_PRESETS = [
-  { label: "Haidian", coordinates: { lat: 39.98, lng: 116.32 } },
-  { label: "Wangjing", coordinates: { lat: 39.99, lng: 116.47 } },
-  { label: "Chaoyang", coordinates: { lat: 39.92, lng: 116.45 } },
+const haidian: GeocodeCandidate = {
+  formattedAddress: "北京市海淀区中关村大街",
+  coordinates: { lat: 39.98, lng: 116.32 },
+};
+
+const wangjingStreet: GeocodeCandidate = {
+  formattedAddress: "北京市朝阳区望京街",
+  coordinates: { lat: 39.99, lng: 116.47 },
+};
+
+const wangjingXiyuan: GeocodeCandidate = {
+  formattedAddress: "北京市朝阳区望京西园",
+  coordinates: { lat: 39.995, lng: 116.475 },
+};
+
+const chaoyang: GeocodeCandidate = {
+  formattedAddress: "北京市朝阳区三里屯路",
+  coordinates: { lat: 39.92, lng: 116.45 },
+};
+
+/**
+ * Form address presets for the local demo.
+ * "望京" is intentionally ambiguous so organizers can exercise disambiguation.
+ */
+export const DEMO_ADDRESS_PRESETS = [
+  { label: "Haidian", address: "中关村" },
+  { label: "Wangjing", address: "望京" },
+  { label: "Chaoyang", address: "三里屯" },
 ] as const;
+
+/** Resolved coordinates used to script driving Distances for unique hits. */
+const demoResolvedPoints = [haidian, wangjingStreet, chaoyang] as const;
 
 /**
  * Fake MapProvider seeded for the local demo (no live 高德).
- * Driving Distances are scripted for the form presets — not crow-fly.
+ * Geocode + driving Distances are scripted for the form presets.
  */
 export function createDemoMapProvider(): FakeMapProvider {
   const map = new FakeMapProvider({
     branchesByBrand: { 滨寿司: demoBranches },
+    geocodeResults: {
+      中关村: [haidian],
+      望京: [wangjingStreet, wangjingXiyuan],
+      三里屯: [chaoyang],
+      海淀: [haidian],
+      朝阳: [chaoyang],
+    },
   });
 
-  const distanceTable: Record<number, Record<string, number>> = {
-    0: {
+  // Ambiguous "望京西园" still has Distances so a picked candidate can search.
+  const distanceTable: Record<string, Record<string, number>> = {
+    "39.98,116.32": {
       "demo-zhongguancun": 1200,
       "demo-wangjing": 18000,
       "demo-sanlitun": 14000,
       "demo-guomao": 16000,
     },
-    1: {
+    "39.99,116.47": {
       "demo-zhongguancun": 17000,
       "demo-wangjing": 1500,
       "demo-sanlitun": 9000,
       "demo-guomao": 11000,
     },
-    2: {
+    "39.995,116.475": {
+      "demo-zhongguancun": 17500,
+      "demo-wangjing": 800,
+      "demo-sanlitun": 9500,
+      "demo-guomao": 11500,
+    },
+    "39.92,116.45": {
       "demo-zhongguancun": 15000,
       "demo-wangjing": 10000,
       "demo-sanlitun": 2000,
@@ -66,15 +106,17 @@ export function createDemoMapProvider(): FakeMapProvider {
     },
   };
 
-  for (const [i, preset] of DEMO_PRESETS.entries()) {
+  for (const point of [
+    ...demoResolvedPoints,
+    wangjingXiyuan,
+  ]) {
+    const key = `${point.coordinates.lat},${point.coordinates.lng}`;
+    const row = distanceTable[key];
+    if (!row) continue;
     for (const branch of demoBranches) {
-      const meters = distanceTable[i]?.[branch.id];
+      const meters = row[branch.id];
       if (meters !== undefined) {
-        map.setDrivingDistance(
-          preset.coordinates,
-          branch.coordinates,
-          meters,
-        );
+        map.setDrivingDistance(point.coordinates, branch.coordinates, meters);
       }
     }
   }

@@ -85,7 +85,7 @@
 
       .participant-row {
         display: grid;
-        grid-template-columns: 1.2fr 1fr 1fr auto;
+        grid-template-columns: 1fr 1.6fr auto;
         gap: 0.5rem;
         align-items: end;
       }
@@ -121,6 +121,12 @@
         filter: brightness(1.05);
       }
 
+      button.primary:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+        filter: none;
+      }
+
       #status {
         min-height: 1.25rem;
         color: var(--muted);
@@ -137,6 +143,48 @@
         border: 1px solid #f0c2c2;
         padding: 1rem 1.1rem;
         line-height: 1.45;
+      }
+
+      .disambiguation {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        padding: 1rem 1.1rem;
+        display: grid;
+        gap: 1rem;
+      }
+
+      .disambiguation h2 {
+        margin: 0;
+        font-size: 1.1rem;
+      }
+
+      .disambiguation-block {
+        display: grid;
+        gap: 0.45rem;
+      }
+
+      .disambiguation-block p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .choice {
+        display: flex;
+        gap: 0.55rem;
+        align-items: flex-start;
+        font-weight: 400;
+        font-size: 0.95rem;
+      }
+
+      .choice input {
+        margin-top: 0.25rem;
+      }
+
+      .hint {
+        color: var(--muted);
+        font-size: 0.85rem;
+        margin: 0;
       }
 
       .ranking {
@@ -204,8 +252,13 @@
     <main>
       <h1>MeetingSearch</h1>
       <p class="lede">
-        Submit resolved Participants, a Brand, and a Proximity objective to rank
-        Branches. Uses a fake MapProvider locally — no 高德 key required.
+        Enter Participant addresses as free text. Unique geocode hits apply
+        automatically; ambiguous matches need a choice before Ranking runs.
+        Uses a fake MapProvider locally — no 高德 key required.
+      </p>
+      <p class="hint">
+        Demo addresses: 「海淀区中关村」 (unique), 「望京」 (ambiguous),
+        「朝阳区三里屯」 (unique).
       </p>
 
       <form id="search-form">
@@ -235,7 +288,7 @@
           </label>
         </div>
 
-        <button class="primary" type="submit">Search</button>
+        <button class="primary" type="submit" id="search-button">Search</button>
         <div id="status"></div>
       </form>
 
@@ -244,28 +297,29 @@
 
     <script>
       const presets = [
-        { label: "Haidian", lat: 39.98, lng: 116.32 },
-        { label: "Wangjing", lat: 39.99, lng: 116.47 },
-        { label: "Chaoyang", lat: 39.92, lng: 116.45 },
+        { label: "Haidian", address: "海淀区中关村" },
+        { label: "Wangjing", address: "望京" },
+        { label: "Chaoyang", address: "朝阳区三里屯" },
       ];
 
       const participantsEl = document.getElementById("participants");
       const form = document.getElementById("search-form");
       const resultEl = document.getElementById("result");
       const statusEl = document.getElementById("status");
+      const searchButton = document.getElementById("search-button");
+
+      /** Pending disambiguation: index → { label, address, candidates, selectedIndex? } */
+      let pendingAmbiguous = null;
 
       function addParticipantRow(preset) {
         const row = document.createElement("div");
         row.className = "participant-row";
         row.innerHTML = `
           <label>Label
-            <input name="label" value="${preset?.label ?? ""}" required />
+            <input name="label" value="${escapeAttr(preset?.label ?? "")}" required />
           </label>
-          <label>Latitude
-            <input name="lat" type="number" step="any" value="${preset?.lat ?? ""}" required />
-          </label>
-          <label>Longitude
-            <input name="lng" type="number" step="any" value="${preset?.lng ?? ""}" required />
+          <label>Address
+            <input name="address" value="${escapeAttr(preset?.address ?? "")}" required />
           </label>
           <button type="button" class="remove">Remove</button>
         `;
@@ -275,6 +329,7 @@
             return;
           }
           row.remove();
+          clearDisambiguation();
         });
         participantsEl.appendChild(row);
       }
@@ -285,31 +340,192 @@
       document.getElementById("add-participant").addEventListener("click", () => {
         const next = presets[participantsEl.children.length] ?? {
           label: `Participant ${participantsEl.children.length + 1}`,
-          lat: 39.9,
-          lng: 116.4,
+          address: "",
         };
         addParticipantRow(next);
+        clearDisambiguation();
       });
 
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
-        statusEl.textContent = "Searching…";
+        clearDisambiguation();
+        statusEl.textContent = "Geocoding addresses…";
         resultEl.innerHTML = "";
+        searchButton.disabled = true;
 
         const rows = [...participantsEl.querySelectorAll(".participant-row")];
-        const participants = rows.map((row, i) => ({
-          id: `p${i + 1}`,
-          label: row.querySelector('[name="label"]').value,
-          coordinates: {
-            lat: Number(row.querySelector('[name="lat"]').value),
-            lng: Number(row.querySelector('[name="lng"]').value),
-          },
-        }));
+        if (rows.length < 2) {
+          statusEl.textContent = "At least two Participants are required.";
+          searchButton.disabled = false;
+          return;
+        }
+
+        try {
+          const drafts = rows.map((row, i) => ({
+            id: `p${i + 1}`,
+            label: row.querySelector('[name="label"]').value.trim(),
+            address: row.querySelector('[name="address"]').value.trim(),
+          }));
+
+          const geocoded = [];
+          const ambiguous = [];
+
+          for (const draft of drafts) {
+            const res = await fetch("/api/geocode", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ address: draft.address }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+              throw new Error(data.error ?? "Geocode failed");
+            }
+            const candidates = data.candidates ?? [];
+            if (candidates.length === 0) {
+              statusEl.textContent = `No geocode match for “${draft.address}”. Try a different address.`;
+              searchButton.disabled = false;
+              return;
+            }
+            if (candidates.length === 1) {
+              geocoded.push({
+                id: draft.id,
+                label: draft.label,
+                coordinates: candidates[0].coordinates,
+                formattedAddress: candidates[0].formattedAddress,
+              });
+            } else {
+              ambiguous.push({
+                id: draft.id,
+                label: draft.label,
+                address: draft.address,
+                candidates,
+                selectedIndex: null,
+              });
+            }
+          }
+
+          if (ambiguous.length > 0) {
+            pendingAmbiguous = { resolved: geocoded, ambiguous };
+            statusEl.textContent =
+              "Choose a match for each ambiguous address before searching.";
+            resultEl.innerHTML = renderDisambiguation(ambiguous);
+            searchButton.disabled = false;
+            return;
+          }
+
+          await runSearch(geocoded);
+        } catch (err) {
+          statusEl.textContent = err.message ?? String(err);
+          searchButton.disabled = false;
+        }
+      });
+
+      function clearDisambiguation() {
+        pendingAmbiguous = null;
+      }
+
+      function renderDisambiguation(ambiguous) {
+        const blocks = ambiguous
+          .map((item, blockIndex) => {
+            const choices = item.candidates
+              .map(
+                (c, i) => `
+                <label class="choice">
+                  <input
+                    type="radio"
+                    name="pick-${blockIndex}"
+                    value="${i}"
+                    data-block="${blockIndex}"
+                  />
+                  <span>${escapeHtml(c.formattedAddress)}</span>
+                </label>`,
+              )
+              .join("");
+            return `
+              <div class="disambiguation-block" data-block="${blockIndex}">
+                <strong>${escapeHtml(item.label)}</strong>
+                <p>Address “${escapeHtml(item.address)}” matched multiple places:</p>
+                ${choices}
+              </div>`;
+          })
+          .join("");
+
+        return `
+          <div class="disambiguation" id="disambiguation">
+            <h2>Pick a location</h2>
+            ${blocks}
+            <button class="primary" type="button" id="confirm-disambiguation" disabled>
+              Continue search
+            </button>
+          </div>`;
+      }
+
+      resultEl.addEventListener("change", (event) => {
+        const input = event.target;
+        if (!(input instanceof HTMLInputElement) || input.type !== "radio") {
+          return;
+        }
+        if (!pendingAmbiguous) return;
+        const blockIndex = Number(input.dataset.block);
+        if (!Number.isFinite(blockIndex)) return;
+        pendingAmbiguous.ambiguous[blockIndex].selectedIndex = Number(input.value);
+        const confirmBtn = document.getElementById("confirm-disambiguation");
+        if (confirmBtn) {
+          const allPicked = pendingAmbiguous.ambiguous.every(
+            (item) => item.selectedIndex !== null,
+          );
+          confirmBtn.disabled = !allPicked;
+        }
+      });
+
+      resultEl.addEventListener("click", async (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) return;
+        if (target.id !== "confirm-disambiguation") return;
+        if (!pendingAmbiguous) return;
+
+        const allPicked = pendingAmbiguous.ambiguous.every(
+          (item) => item.selectedIndex !== null,
+        );
+        if (!allPicked) {
+          statusEl.textContent =
+            "Select one option for each ambiguous address before searching.";
+          return;
+        }
+
+        const participants = [
+          ...pendingAmbiguous.resolved,
+          ...pendingAmbiguous.ambiguous.map((item) => {
+            const chosen = item.candidates[item.selectedIndex];
+            return {
+              id: item.id,
+              label: item.label,
+              coordinates: chosen.coordinates,
+              formattedAddress: chosen.formattedAddress,
+            };
+          }),
+        ];
+
+        // Keep original form order by id (p1, p2, …).
+        participants.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+
+        clearDisambiguation();
+        resultEl.innerHTML = "";
+        await runSearch(participants);
+      });
+
+      async function runSearch(participants) {
+        statusEl.textContent = "Searching…";
+        searchButton.disabled = true;
 
         const fd = new FormData(form);
         const radiusRaw = fd.get("radiusMeters");
         const payload = {
-          participants,
+          participants: participants.map(({ id, label, coordinates }) => ({
+            id,
+            label,
+            coordinates,
+          })),
           brand: fd.get("brand"),
           objective: fd.get("objective"),
         };
@@ -340,8 +556,10 @@
           resultEl.innerHTML = renderRanking(data);
         } catch (err) {
           statusEl.textContent = err.message ?? String(err);
+        } finally {
+          searchButton.disabled = false;
         }
-      });
+      }
 
       function renderRanking(data) {
         const objectiveLabel =
@@ -374,6 +592,10 @@
           .replaceAll("<", "&lt;")
           .replaceAll(">", "&gt;")
           .replaceAll('"', "&quot;");
+      }
+
+      function escapeAttr(value) {
+        return escapeHtml(value);
       }
     </script>
   </body>

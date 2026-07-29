@@ -34,11 +34,17 @@ export function createApp(deps: AppDeps) {
         return;
       }
 
+      if (req.method === "POST" && url.pathname === "/api/geocode") {
+        await handleGeocode(req, res, deps.mapProvider);
+        return;
+      }
+
       res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
       res.end("Not found");
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      res.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
+      const status = err instanceof HttpError ? err.status : 500;
+      res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
       res.end(JSON.stringify({ error: message }));
     }
   });
@@ -57,6 +63,15 @@ export function createApp(deps: AppDeps) {
     },
     port,
   };
+}
+
+class HttpError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
 }
 
 async function serveForm(res: ServerResponse): Promise<void> {
@@ -85,6 +100,18 @@ async function handleSearch(
   res.end(JSON.stringify(result));
 }
 
+async function handleGeocode(
+  req: IncomingMessage,
+  res: ServerResponse,
+  map: MapProvider,
+): Promise<void> {
+  const body = await readJsonBody(req);
+  const address = parseGeocodeAddress(body);
+  const candidates = await map.geocode(address);
+  res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+  res.end(JSON.stringify({ candidates }));
+}
+
 async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
   for await (const chunk of req) {
@@ -92,9 +119,20 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   }
   const raw = Buffer.concat(chunks).toString("utf8");
   if (!raw.trim()) {
-    throw new Error("Request body is required");
+    throw new HttpError(400, "Request body is required");
   }
   return JSON.parse(raw) as unknown;
+}
+
+function parseGeocodeAddress(body: unknown): string {
+  if (!body || typeof body !== "object") {
+    throw new HttpError(400, "Body must be a JSON object");
+  }
+  const o = body as Record<string, unknown>;
+  if (typeof o.address !== "string" || !o.address.trim()) {
+    throw new HttpError(400, "address is required");
+  }
+  return o.address.trim();
 }
 
 function parseSearchInput(body: unknown): MeetingSearchInput {

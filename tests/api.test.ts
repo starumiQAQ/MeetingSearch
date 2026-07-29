@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { FakeMapProvider } from "../src/fake-map-provider.js";
-import type { Branch } from "../src/types.js";
+import type { Branch, GeocodeCandidate } from "../src/types.js";
 
 const branch: Branch = {
   id: "api-branch",
@@ -10,9 +10,28 @@ const branch: Branch = {
   coordinates: { lat: 39.91, lng: 116.41 },
 };
 
-describe("POST /api/search", () => {
+const uniqueHit: GeocodeCandidate = {
+  formattedAddress: "北京市海淀区中关村大街",
+  coordinates: { lat: 39.98, lng: 116.32 },
+};
+
+const ambiguousA: GeocodeCandidate = {
+  formattedAddress: "北京市朝阳区望京街",
+  coordinates: { lat: 39.99, lng: 116.47 },
+};
+
+const ambiguousB: GeocodeCandidate = {
+  formattedAddress: "北京市朝阳区望京西园",
+  coordinates: { lat: 39.995, lng: 116.475 },
+};
+
+describe("local web API", () => {
   const map = new FakeMapProvider({
     branchesByBrand: { 滨寿司: [branch] },
+    geocodeResults: {
+      中关村: [uniqueHit],
+      望京: [ambiguousA, ambiguousB],
+    },
   });
   map.setDrivingDistance(
     { lat: 39.9, lng: 116.4 },
@@ -41,68 +60,124 @@ describe("POST /api/search", () => {
     await app.stop();
   });
 
-  it("returns a Ranking for resolved Participants", async () => {
-    const res = await fetch(`${baseUrl}/api/search`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        participants: [
-          {
-            id: "alice",
-            label: "Alice",
-            coordinates: { lat: 39.9, lng: 116.4 },
-          },
-          {
-            id: "bob",
-            label: "Bob",
-            coordinates: { lat: 39.92, lng: 116.42 },
-          },
-        ],
-        brand: "滨寿司",
-        objective: "total_distance",
-      }),
+  describe("POST /api/search", () => {
+    it("returns a Ranking for resolved Participants", async () => {
+      const res = await fetch(`${baseUrl}/api/search`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          participants: [
+            {
+              id: "alice",
+              label: "Alice",
+              coordinates: { lat: 39.9, lng: 116.4 },
+            },
+            {
+              id: "bob",
+              label: "Bob",
+              coordinates: { lat: 39.92, lng: 116.42 },
+            },
+          ],
+          brand: "滨寿司",
+          objective: "total_distance",
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.recommendation.branch.id).toBe("api-branch");
+      expect(body.recommendation.score).toBe(3000);
     });
 
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.recommendation.branch.id).toBe("api-branch");
-    expect(body.recommendation.score).toBe(3000);
+    it("returns Empty candidate set guidance when nothing matches", async () => {
+      const res = await fetch(`${baseUrl}/api/search`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          participants: [
+            {
+              id: "alice",
+              label: "Alice",
+              coordinates: { lat: 39.9, lng: 116.4 },
+            },
+            {
+              id: "bob",
+              label: "Bob",
+              coordinates: { lat: 39.92, lng: 116.42 },
+            },
+          ],
+          brand: "不存在的牌子",
+          objective: "minimax",
+        }),
+      });
+
+      expect(res.status).toBe(404);
+      const body = await res.json();
+      expect(body.kind).toBe("empty_candidate_set");
+      expect(body.message).toMatch(/radius/i);
+      expect(body.message).toMatch(/brand/i);
+    });
   });
 
-  it("returns Empty candidate set guidance when nothing matches", async () => {
-    const res = await fetch(`${baseUrl}/api/search`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        participants: [
-          {
-            id: "alice",
-            label: "Alice",
-            coordinates: { lat: 39.9, lng: 116.4 },
-          },
-          {
-            id: "bob",
-            label: "Bob",
-            coordinates: { lat: 39.92, lng: 116.42 },
-          },
-        ],
-        brand: "不存在的牌子",
-        objective: "minimax",
-      }),
+  describe("POST /api/geocode", () => {
+    it("returns a unique candidate list for a clear address", async () => {
+      const res = await fetch(`${baseUrl}/api/geocode`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address: "中关村" }),
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.candidates).toEqual([uniqueHit]);
     });
 
-    expect(res.status).toBe(404);
-    const body = await res.json();
-    expect(body.kind).toBe("empty_candidate_set");
-    expect(body.message).toMatch(/radius/i);
-    expect(body.message).toMatch(/brand/i);
+    it("returns multiple candidates when the address is ambiguous", async () => {
+      const res = await fetch(`${baseUrl}/api/geocode`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address: "望京" }),
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.candidates).toEqual([ambiguousA, ambiguousB]);
+    });
+
+    it("returns an empty candidates list when nothing matches", async () => {
+      const res = await fetch(`${baseUrl}/api/geocode`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address: "不存在的地址" }),
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.candidates).toEqual([]);
+    });
+
+    it("rejects a missing address", async () => {
+      const res = await fetch(`${baseUrl}/api/geocode`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toMatch(/address/i);
+    });
   });
 
-  it("serves the form at GET /", async () => {
+  it("serves the form with address fields and geocode before search", async () => {
     const res = await fetch(`${baseUrl}/`);
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).toContain("MeetingSearch");
+    expect(html).toContain('name="address"');
+    expect(html).toContain("/api/geocode");
     expect(html).toContain("/api/search");
+    expect(html).not.toContain('name="lat"');
+    expect(html).not.toContain('name="lng"');
   });
 });

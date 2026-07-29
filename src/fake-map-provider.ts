@@ -1,27 +1,39 @@
-import type { Branch, Coordinates, MapProvider } from "../src/types.js";
+import type {
+  Branch,
+  Coordinates,
+  GeocodeCandidate,
+  MapProvider,
+} from "../src/types.js";
 
 /**
  * In-memory MapProvider for demos and MeetingSearch seam tests.
- * Distances and Branch search results are scripted by the caller.
+ * Distances, Branch search, and geocode results are scripted by the caller.
  */
 export class FakeMapProvider implements MapProvider {
   private readonly branchesByBrand: Map<string, Branch[]>;
   private readonly distances: Map<string, number>;
+  private readonly geocodeResults: Map<string, GeocodeCandidate[]>;
   readonly searchCalls: Array<{
     brand: string;
     near: Coordinates;
     radiusMeters: number;
   }> = [];
+  readonly geocodeCalls: string[] = [];
 
   constructor(options?: {
     branchesByBrand?: Record<string, Branch[]>;
     /** Key: `${fromLat},${fromLng}->${toLat},${toLng}` → meters */
     distances?: Record<string, number>;
+    /** Exact address string → candidate list (0 / 1 / N). */
+    geocodeResults?: Record<string, GeocodeCandidate[]>;
   }) {
     this.branchesByBrand = new Map(
       Object.entries(options?.branchesByBrand ?? {}),
     );
     this.distances = new Map(Object.entries(options?.distances ?? {}));
+    this.geocodeResults = new Map(
+      Object.entries(options?.geocodeResults ?? {}),
+    );
   }
 
   async searchBranches(params: {
@@ -55,6 +67,20 @@ export class FakeMapProvider implements MapProvider {
     meters: number,
   ): void {
     this.distances.set(distanceKey(from, to), meters);
+  }
+
+  async geocode(address: string): Promise<GeocodeCandidate[]> {
+    const key = address.trim();
+    this.geocodeCalls.push(key);
+    const candidates = this.geocodeResults.get(key) ?? [];
+    return candidates.map((c) => ({
+      formattedAddress: c.formattedAddress,
+      coordinates: { ...c.coordinates },
+    }));
+  }
+
+  setGeocodeResults(address: string, candidates: GeocodeCandidate[]): void {
+    this.geocodeResults.set(address, candidates);
   }
 }
 

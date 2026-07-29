@@ -324,7 +324,7 @@
 
       /** Pending disambiguation: index → { label, address, candidates, selectedIndex? } */
       let pendingAmbiguous = null;
-      /** Last geocoded Participants + fingerprint of label/address rows. */
+      /** Cached geocoded Participants + fingerprint of address rows. */
       let lastResolved = null;
 
       function readParticipantDrafts() {

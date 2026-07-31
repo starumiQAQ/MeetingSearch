@@ -1,35 +1,23 @@
 import { loadEnvFile } from "./load-env.js";
 import { createApp } from "./app.js";
-import { AmapMapProvider } from "./amap-map-provider.js";
-import { createDemoMapProvider } from "./demo-map-provider.js";
-import { DEFAULT_AMAP_QPS, type MapProvider } from "./types.js";
+import { buildMapServicesFromEnv } from "./map-services.js";
 
 loadEnvFile();
 
 const PORT = Number(process.env.PORT ?? 3000);
-const amapKey = process.env.AMAP_KEY?.trim();
-const amapJsKey =
-  process.env.AMAP_JS_KEY?.trim() || amapKey || "";
-const amapSecurityJsCode = process.env.AMAP_SECURITY_JS_CODE?.trim() || "";
-const amapQps = parseQps(
-  process.env.AMAP_QPS ?? process.env.AMAP_CONCURRENCY,
-  DEFAULT_AMAP_QPS,
-);
-
-const mapProvider: MapProvider = amapKey
-  ? new AmapMapProvider({
-      apiKey: amapKey,
-      qps: amapQps,
-    })
-  : createDemoMapProvider();
+const {
+  mapProvider,
+  mapUi,
+  amapKey,
+  amapJsKey,
+  amapSecurityJsCode,
+  amapQps,
+} = buildMapServicesFromEnv(process.env);
 
 const app = createApp({
   mapProvider,
   port: PORT,
-  mapUi: {
-    jsKey: amapJsKey,
-    securityJsCode: amapSecurityJsCode,
-  },
+  mapUi,
 });
 
 await app.start();
@@ -53,11 +41,4 @@ if (amapJsKey) {
   console.log(
     "Map UI: no AMAP_JS_KEY / AMAP_KEY — browser map disabled; search still works",
   );
-}
-
-function parseQps(raw: string | undefined, fallback: number): number {
-  if (raw === undefined || raw.trim() === "") return fallback;
-  const n = Number(raw);
-  if (!Number.isFinite(n) || n <= 0) return fallback;
-  return n;
 }

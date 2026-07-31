@@ -3,18 +3,14 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { meetingSearch } from "./meeting-search.js";
+import type { MapUiConfig } from "./map-services.js";
 import type { MapProvider, MeetingSearchInput, ProximityObjective } from "./types.js";
 import { isEmptyCandidateSet, isMapProviderError } from "./types.js";
 
+export type { MapUiConfig } from "./map-services.js";
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PORT = Number(process.env.PORT ?? 3000);
-
-export type MapUiConfig = {
-  /** 高德 Web 端 (JS API) key — injected into the page for map display. */
-  jsKey?: string;
-  /** JS API securityJsCode (required for keys created after 2021-12-02). */
-  securityJsCode?: string;
-};
 
 export type AppDeps = {
   mapProvider: MapProvider;
@@ -22,10 +18,20 @@ export type AppDeps = {
   mapUi?: MapUiConfig;
 };
 
+export type ReplaceableMapServices = {
+  mapProvider?: MapProvider;
+  mapUi?: MapUiConfig;
+};
+
 export function createApp(deps: AppDeps) {
   const port = deps.port ?? DEFAULT_PORT;
+  let mapProvider = deps.mapProvider;
+  let mapUi = deps.mapUi;
 
   const server = createServer(async (req, res) => {
+    // Capture at request start so a mid-flight swap does not tear down in-flight work.
+    const providerForRequest = mapProvider;
+    const mapUiForRequest = mapUi;
     try {
       const url = new URL(
         req.url ?? "/",
@@ -33,17 +39,17 @@ export function createApp(deps: AppDeps) {
       );
 
       if (req.method === "GET" && url.pathname === "/") {
-        await serveForm(res, deps.mapUi);
+        await serveForm(res, mapUiForRequest);
         return;
       }
 
       if (req.method === "POST" && url.pathname === "/api/search") {
-        await handleSearch(req, res, deps.mapProvider);
+        await handleSearch(req, res, providerForRequest);
         return;
       }
 
       if (req.method === "POST" && url.pathname === "/api/geocode") {
-        await handleGeocode(req, res, deps.mapProvider);
+        await handleGeocode(req, res, providerForRequest);
         return;
       }
 
@@ -72,6 +78,18 @@ export function createApp(deps: AppDeps) {
       return new Promise((resolve, reject) => {
         server.close((err) => (err ? reject(err) : resolve()));
       });
+    },
+    /**
+     * Hot-swap MapProvider and/or MapUi for subsequent requests (ADR-0004 prep).
+     * Omitting a field leaves the current value unchanged.
+     */
+    replaceMapServices(next: ReplaceableMapServices): void {
+      if (next.mapProvider !== undefined) {
+        mapProvider = next.mapProvider;
+      }
+      if (next.mapUi !== undefined) {
+        mapUi = next.mapUi;
+      }
     },
     port,
   };

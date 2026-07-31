@@ -543,7 +543,7 @@ describe("buildMapServicesFromEnv via createApp", () => {
     }
   });
 
-  it("falls AMAP_JS_KEY back to AMAP_KEY for MapUi injection", async () => {
+  it("injects AMAP_KEY as jsKey when AMAP_JS_KEY is empty", async () => {
     const { mapUi } = buildMapServicesFromEnv({
       AMAP_KEY: "web-service-key",
       AMAP_JS_KEY: "  ",

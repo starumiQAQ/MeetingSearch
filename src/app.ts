@@ -18,7 +18,8 @@ export type AppDeps = {
   mapUi?: MapUiConfig;
 };
 
-export type ReplaceableMapServices = {
+/** Partial hot-swap; omitted fields keep their current values. */
+export type ReplaceMapServicesInput = {
   mapProvider?: MapProvider;
   mapUi?: MapUiConfig;
 };
@@ -83,7 +84,7 @@ export function createApp(deps: AppDeps) {
      * Hot-swap MapProvider and/or MapUi for subsequent requests (ADR-0004 prep).
      * Omitting a field leaves the current value unchanged.
      */
-    replaceMapServices(next: ReplaceableMapServices): void {
+    replaceMapServices(next: ReplaceMapServicesInput): void {
       if (next.mapProvider !== undefined) {
         mapProvider = next.mapProvider;
       }

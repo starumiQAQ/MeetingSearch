@@ -1,24 +1,27 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>MeetingSearch</title>
+    <title>约了吗</title>
     <style>
       :root {
-        --ink: #1a1f2e;
-        --muted: #5c6578;
-        --line: #d8dde8;
-        --bg: #f3f5f9;
+        --ink: #1f2937;
+        --muted: #6b7280;
+        --line: #e5e7eb;
+        --bg: #f3f4f8;
         --panel: #ffffff;
-        --accent: #0f6b5c;
-        --accent-soft: #e6f3f0;
-        --danger: #9b2c2c;
-        --danger-bg: #fdeaea;
-        --recommend: #0b4f44;
-        --map-empty: rgba(243, 245, 249, 0.92);
-        --drawer-shadow: 0 -8px 32px rgba(26, 31, 46, 0.12);
-        --header-h: 3.5rem;
+        --accent: #059669;
+        --accent-hover: #047857;
+        --accent-soft: #ecfdf5;
+        --blue: #3b82f6;
+        --blue-soft: #eff6ff;
+        --danger: #dc2626;
+        --danger-bg: #fef2f2;
+        --recommend: #047857;
+        --shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+        --radius: 14px;
+        --radius-sm: 10px;
       }
 
       * {
@@ -32,11 +35,12 @@
       }
 
       body {
-        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+        font-family: -apple-system, system-ui, "PingFang SC", "Helvetica Neue",
+          "Segoe UI", sans-serif;
         color: var(--ink);
         background:
-          radial-gradient(ellipse 80% 50% at 10% -10%, #d7ebe6 0%, transparent 55%),
-          radial-gradient(ellipse 60% 40% at 100% 0%, #e4e9f5 0%, transparent 50%),
+          radial-gradient(ellipse 70% 45% at 0% 0%, #e0e7ff 0%, transparent 55%),
+          radial-gradient(ellipse 55% 40% at 100% 0%, #d1fae5 0%, transparent 50%),
           var(--bg);
       }
 
@@ -53,30 +57,38 @@
         align-items: center;
         justify-content: space-between;
         gap: 1rem;
-        padding: 0.75rem 1.25rem;
-        border-bottom: 1px solid var(--line);
-        background: color-mix(in srgb, var(--panel) 88%, transparent);
-        backdrop-filter: blur(8px);
-        min-height: var(--header-h);
+        padding: 1rem 1.5rem 0.75rem;
       }
 
       .brand-block {
         display: flex;
-        flex-direction: column;
-        gap: 0.1rem;
+        align-items: center;
+        gap: 0.75rem;
         min-width: 0;
       }
 
-      .brand-block h1 {
-        font-family: "IBM Plex Serif", Georgia, serif;
-        font-weight: 600;
-        font-size: clamp(1.35rem, 2.5vw, 1.75rem);
-        letter-spacing: -0.02em;
-        margin: 0;
+      .brand-mark {
+        width: 2.4rem;
+        height: 2.4rem;
+        border-radius: 999px;
+        background: linear-gradient(145deg, #60a5fa, #3b82f6);
+        color: #fff;
+        display: grid;
+        place-content: center;
+        font-size: 1.1rem;
+        flex: 0 0 auto;
+        box-shadow: 0 6px 16px rgba(59, 130, 246, 0.28);
       }
 
-      .brand-block .tagline {
+      .brand-text h1 {
+        font-weight: 700;
+        font-size: 1.35rem;
         margin: 0;
+        letter-spacing: -0.02em;
+      }
+
+      .brand-text .tagline {
+        margin: 0.1rem 0 0;
         color: var(--muted);
         font-size: 0.85rem;
       }
@@ -84,114 +96,100 @@
       .topbar-actions {
         display: flex;
         align-items: center;
-        gap: 0.5rem;
+        gap: 0.75rem;
+      }
+
+      .api-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.35rem 0.7rem;
+        border-radius: 999px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 0.8rem;
+        box-shadow: var(--shadow);
+      }
+
+      .api-pill .dot {
+        width: 0.5rem;
+        height: 0.5rem;
+        border-radius: 999px;
+        background: #22c55e;
+        box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
+      }
+
+      .api-pill.offline .dot {
+        background: #9ca3af;
+        box-shadow: none;
       }
 
       .layout {
         flex: 1 1 auto;
         display: grid;
-        grid-template-columns: minmax(280px, 380px) 1fr;
-        gap: 0.875rem;
-        padding: 0 0.875rem 0.875rem;
+        grid-template-columns: minmax(300px, 400px) 1fr;
+        gap: 1rem;
+        padding: 0 1.25rem 1.25rem;
+        min-height: 0;
+      }
+
+      .side,
+      .map-pane {
+        background: var(--panel);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        border: 1px solid rgba(229, 231, 235, 0.9);
         min-height: 0;
       }
 
       .side {
         overflow: auto;
-        padding: 1.1rem 1.15rem 2rem;
-        background: color-mix(in srgb, var(--panel) 70%, transparent);
-        border: 1px solid var(--line);
-        border-radius: 6px;
+        padding: 1.15rem 1.15rem 1.35rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1.15rem;
       }
 
-      .side form {
-        display: grid;
-        gap: 1rem;
+      .section-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        margin: 0 0 0.75rem;
+        font-size: 1rem;
+        font-weight: 700;
       }
 
-      label {
+      .section-title .count {
+        font-weight: 500;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      label.field {
         display: grid;
         gap: 0.35rem;
         font-size: 0.85rem;
         font-weight: 600;
+        margin-bottom: 0.75rem;
       }
 
       input,
       select {
         font: inherit;
-        padding: 0.55rem 0.65rem;
+        padding: 0.7rem 0.8rem;
         border: 1px solid var(--line);
         background: #fff;
         color: var(--ink);
-        border-radius: 2px;
+        border-radius: var(--radius-sm);
+        width: 100%;
       }
 
-      .participants {
-        display: grid;
-        gap: 0.75rem;
-      }
-
-      .participant-block {
-        display: grid;
-        gap: 0.45rem;
-        padding-bottom: 0.35rem;
-        border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
-      }
-
-      .participant-block:last-child {
-        border-bottom: none;
-        padding-bottom: 0;
-      }
-
-      .participant-row {
-        display: grid;
-        grid-template-columns: 1fr 1.6fr;
-        gap: 0.5rem;
-        align-items: end;
-      }
-
-      .participant-actions {
-        display: flex;
-        gap: 0.5rem;
-        grid-column: 1 / -1;
-      }
-
-      .participant-actions button {
-        flex: 1 1 auto;
-        height: 2.4rem;
-      }
-
-      .geocode-panel {
-        display: grid;
-        gap: 0.35rem;
-        padding: 0.35rem 0 0.15rem;
-      }
-
-      .geocode-panel[hidden] {
-        display: none;
-      }
-
-      .geocode-panel .candidate-lead {
-        margin: 0;
-        color: var(--muted);
-        font-size: 0.85rem;
-        font-weight: 400;
-      }
-
-      .resolved-hint {
-        margin: 0;
-        color: var(--accent);
-        font-size: 0.85rem;
-        font-weight: 500;
-      }
-
-      .resolved-hint[hidden] {
-        display: none;
-      }
-
-      .prefs {
-        display: grid;
-        gap: 0.75rem;
+      input:focus,
+      select:focus {
+        outline: 2px solid color-mix(in srgb, var(--blue) 35%, transparent);
+        border-color: color-mix(in srgb, var(--blue) 55%, var(--line));
       }
 
       button {
@@ -199,53 +197,227 @@
         cursor: pointer;
         border: 1px solid var(--line);
         background: #fff;
-        padding: 0.5rem 0.85rem;
-        border-radius: 2px;
+        padding: 0.55rem 0.85rem;
+        border-radius: var(--radius-sm);
+        color: var(--ink);
       }
 
-      button.primary {
-        background: var(--accent);
-        border-color: var(--accent);
-        color: #fff;
-        font-weight: 600;
-        padding: 0.65rem 1.2rem;
-        width: 100%;
-      }
-
-      button.primary:hover {
-        filter: brightness(1.05);
-      }
-
-      button.primary:disabled {
+      button:disabled {
         opacity: 0.55;
         cursor: not-allowed;
-        filter: none;
       }
 
       button.ghost {
         background: transparent;
       }
 
-      #status {
-        min-height: 1.25rem;
+      button.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+        font-weight: 650;
+        padding: 0.85rem 1.1rem;
+        width: 100%;
+        border-radius: 12px;
+        box-shadow: 0 8px 20px rgba(5, 150, 105, 0.22);
+      }
+
+      button.primary:hover:not(:disabled) {
+        background: var(--accent-hover);
+      }
+
+      button.primary:disabled {
+        filter: none;
+        box-shadow: none;
+      }
+
+      button.blue {
+        background: var(--blue);
+        border-color: var(--blue);
+        color: #fff;
+        font-weight: 600;
+      }
+
+      button.blue:hover:not(:disabled) {
+        filter: brightness(1.05);
+      }
+
+      button.outline-blue {
+        border-color: color-mix(in srgb, var(--blue) 45%, var(--line));
+        color: var(--blue);
+        background: #fff;
+      }
+
+      .pick-address {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+        padding: 0.85rem 1rem;
+        border: 1.5px dashed color-mix(in srgb, var(--blue) 45%, var(--line));
+        color: var(--blue);
+        background: var(--blue-soft);
+        font-weight: 600;
+      }
+
+      .pick-address:disabled {
+        opacity: 0.45;
+      }
+
+      .address-picker {
+        display: grid;
+        gap: 0.65rem;
+        margin-top: 0.15rem;
+      }
+
+      .address-picker[hidden] {
+        display: none;
+      }
+
+      .search-row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 0.5rem;
+      }
+
+      .picker-actions {
+        display: flex;
+        gap: 0.5rem;
+      }
+
+      .picker-actions button {
+        flex: 1;
+      }
+
+      .geocode-panel {
+        display: grid;
+        gap: 0.35rem;
+        max-height: 220px;
+        overflow: auto;
+        padding: 0.15rem;
+      }
+
+      .geocode-panel[hidden] {
+        display: none;
+      }
+
+      .candidate-lead {
+        margin: 0;
         color: var(--muted);
+        font-size: 0.82rem;
+        font-weight: 500;
+      }
+
+      .choice {
+        display: flex;
+        gap: 0.55rem;
+        align-items: flex-start;
+        font-weight: 400;
+        font-size: 0.92rem;
+        padding: 0.55rem 0.6rem;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        background: #fff;
+      }
+
+      .choice:hover,
+      .choice.selected {
+        background: var(--blue-soft);
+        border-color: color-mix(in srgb, var(--blue) 40%, var(--line));
+      }
+
+      .choice input {
+        width: auto;
+        margin-top: 0.2rem;
+        padding: 0;
+      }
+
+      .choice .sub {
+        display: block;
+        color: var(--muted);
+        font-size: 0.8rem;
+        margin-top: 0.15rem;
+      }
+
+      .list-empty {
+        text-align: center;
+        color: var(--muted);
+        padding: 1.25rem 0.75rem;
+        border: 1px dashed var(--line);
+        border-radius: var(--radius-sm);
+        background: #fafafa;
+      }
+
+      .list-empty .icon {
+        font-size: 1.6rem;
+        margin-bottom: 0.35rem;
+      }
+
+      .list-empty p {
+        margin: 0.15rem 0;
         font-size: 0.9rem;
+      }
+
+      .participant-list {
+        display: grid;
+        gap: 0.55rem;
+      }
+
+      .participant-item {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 0.35rem 0.75rem;
+        align-items: start;
+        padding: 0.75rem 0.85rem;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+        background: #fff;
+      }
+
+      .participant-item strong {
+        font-size: 0.95rem;
+      }
+
+      .participant-item .addr {
+        grid-column: 1 / -1;
+        color: var(--muted);
+        font-size: 0.82rem;
+        line-height: 1.4;
+      }
+
+      .participant-item .remove {
+        border: none;
+        background: transparent;
+        color: var(--danger);
+        padding: 0.1rem 0.25rem;
+        font-size: 0.85rem;
+      }
+
+      .prefs {
+        display: grid;
+        gap: 0.15rem;
+      }
+
+      #status {
+        min-height: 1.2rem;
+        color: var(--muted);
+        font-size: 0.88rem;
       }
 
       .hint {
         color: var(--muted);
-        font-size: 0.85rem;
-        margin: 0;
+        font-size: 0.82rem;
+        margin: 0 0 0.65rem;
         line-height: 1.45;
       }
 
       .map-pane {
         position: relative;
         min-height: 320px;
-        background: #e8ecf3;
-        border-radius: 6px;
         overflow: hidden;
-        border: 1px solid var(--line);
+        background: #eef2f7;
       }
 
       #map {
@@ -259,20 +431,16 @@
         inset: 0;
         display: grid;
         place-content: center;
-        gap: 0.5rem;
+        gap: 0.45rem;
         padding: 2rem;
         text-align: center;
         pointer-events: none;
         z-index: 1;
+        background: rgba(255, 255, 255, 0.72);
       }
 
       .map-placeholder {
-        background: var(--map-empty);
         pointer-events: auto;
-      }
-
-      .map-empty {
-        background: transparent;
       }
 
       .map-empty.hidden,
@@ -280,12 +448,17 @@
         display: none;
       }
 
+      .map-empty .map-icon,
+      .map-placeholder .map-icon {
+        font-size: 2.4rem;
+        margin-bottom: 0.25rem;
+      }
+
       .map-empty h2,
       .map-placeholder h2 {
         margin: 0;
-        font-family: "IBM Plex Serif", Georgia, serif;
-        font-size: 1.25rem;
-        font-weight: 600;
+        font-size: 1.2rem;
+        font-weight: 700;
       }
 
       .map-empty p,
@@ -299,15 +472,16 @@
 
       .drawer {
         position: absolute;
-        left: 0.75rem;
-        right: 0.75rem;
-        bottom: 0.75rem;
+        left: 0.85rem;
+        right: 0.85rem;
+        bottom: 0.85rem;
         max-height: min(48%, 420px);
         display: flex;
         flex-direction: column;
         background: var(--panel);
         border: 1px solid var(--line);
-        box-shadow: var(--drawer-shadow);
+        border-radius: var(--radius-sm);
+        box-shadow: 0 -8px 32px rgba(15, 23, 42, 0.12);
         z-index: 2;
         transform: translateY(110%);
         opacity: 0;
@@ -328,9 +502,8 @@
         align-items: center;
         justify-content: space-between;
         gap: 0.75rem;
-        padding: 0.65rem 0.85rem;
+        padding: 0.7rem 0.9rem;
         border-bottom: 1px solid var(--line);
-        flex: 0 0 auto;
       }
 
       .drawer-header h2 {
@@ -348,8 +521,9 @@
       .empty {
         background: var(--danger-bg);
         color: var(--danger);
-        border: 1px solid #f0c2c2;
+        border: 1px solid #fecaca;
         padding: 1rem 1.1rem;
+        border-radius: var(--radius-sm);
         line-height: 1.45;
       }
 
@@ -359,27 +533,6 @@
 
       .empty p:last-child {
         margin-bottom: 0;
-      }
-
-      .choice {
-        display: flex;
-        gap: 0.55rem;
-        align-items: flex-start;
-        font-weight: 400;
-        font-size: 0.95rem;
-        padding: 0.35rem 0.4rem;
-        border: 1px solid transparent;
-        cursor: pointer;
-      }
-
-      .choice:hover,
-      .choice.selected {
-        background: var(--accent-soft);
-        border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
-      }
-
-      .choice input {
-        margin-top: 0.25rem;
       }
 
       .ranking {
@@ -396,6 +549,7 @@
         width: 100%;
         font: inherit;
         color: inherit;
+        border-radius: var(--radius-sm);
       }
 
       .entry:hover {
@@ -421,7 +575,6 @@
         display: inline-block;
         font-size: 0.75rem;
         font-weight: 700;
-        text-transform: uppercase;
         letter-spacing: 0.04em;
         color: var(--recommend);
         margin-bottom: 0.35rem;
@@ -446,37 +599,30 @@
       @media (max-width: 840px) {
         .layout {
           grid-template-columns: 1fr;
-          grid-template-rows: auto minmax(50vh, 1fr);
+          grid-template-rows: auto minmax(48vh, 1fr);
         }
 
-        .side {
-          max-height: none;
-        }
-
-        .participant-row {
-          grid-template-columns: 1fr;
-        }
-
-        .drawer {
-          max-height: min(55%, 360px);
+        .topbar {
+          padding: 0.85rem 1rem 0.5rem;
         }
       }
     </style>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Serif:wght@600&display=swap"
-      rel="stylesheet"
-    />
   </head>
   <body>
     <div class="app">
       <header class="topbar">
         <div class="brand-block">
-          <h1 id="product-title">MeetingSearch</h1>
-          <p class="tagline" data-i18n="tagline"></p>
+          <div class="brand-mark" aria-hidden="true">📍</div>
+          <div class="brand-text">
+            <h1 id="product-title">约了吗</h1>
+            <p class="tagline" data-i18n="tagline"></p>
+          </div>
         </div>
         <div class="topbar-actions">
+          <div class="api-pill offline" id="api-pill">
+            <span class="dot" aria-hidden="true"></span>
+            <span id="api-pill-text"></span>
+          </div>
           <button type="button" class="ghost" id="lang-toggle" aria-label="Language">
             EN
           </button>
@@ -485,24 +631,52 @@
 
       <div class="layout">
         <aside class="side">
-          <form id="search-form">
+          <section>
+            <h2 class="section-title" data-i18n="addSection"></h2>
             <p class="hint" data-i18n="demoHint"></p>
-            <div class="participants" id="participants"></div>
-            <button type="button" id="add-participant" data-i18n="addParticipant"></button>
+            <label class="field">
+              <span data-i18n="label"></span>
+              <input id="composer-label" name="label" data-i18n-placeholder="labelPlaceholder" />
+            </label>
+            <button type="button" class="pick-address" id="open-address-picker" data-i18n="pickAddress"></button>
+            <div class="address-picker" id="address-picker" hidden>
+              <div class="search-row">
+                <input
+                  id="composer-address"
+                  data-i18n-placeholder="addressPlaceholder"
+                />
+                <button type="button" class="blue" id="lookup-address" data-i18n="lookupAddress"></button>
+              </div>
+              <div class="geocode-panel" id="geocode-panel" hidden></div>
+              <div class="picker-actions">
+                <button type="button" class="outline-blue" id="cancel-picker" data-i18n="cancel"></button>
+              </div>
+            </div>
+          </section>
 
-            <div class="prefs">
-              <label>
+          <section>
+            <h2 class="section-title">
+              <span data-i18n="listSection"></span>
+              <span class="count" id="list-count"></span>
+            </h2>
+            <div class="participant-list" id="participant-list"></div>
+          </section>
+
+          <form id="search-form">
+            <section class="prefs">
+              <h2 class="section-title" data-i18n="prefsSection"></h2>
+              <label class="field">
                 <span data-i18n="brand"></span>
                 <input name="brand" value="滨寿司" required />
               </label>
-              <label>
+              <label class="field">
                 <span data-i18n="objective"></span>
                 <select name="objective">
                   <option value="total_distance" data-i18n="objectiveTotal"></option>
                   <option value="minimax" data-i18n="objectiveMinimax"></option>
                 </select>
               </label>
-              <label>
+              <label class="field">
                 <span data-i18n="radius"></span>
                 <input
                   name="radiusMeters"
@@ -511,7 +685,7 @@
                   data-i18n-placeholder="radiusPlaceholder"
                 />
               </label>
-            </div>
+            </section>
 
             <button class="primary" type="submit" id="search-button" data-i18n="search"></button>
             <div id="status"></div>
@@ -521,10 +695,12 @@
         <section class="map-pane" aria-label="Map">
           <div id="map"></div>
           <div class="map-placeholder" id="map-placeholder">
+            <div class="map-icon" aria-hidden="true">🗺️</div>
             <h2 data-i18n="mapUnavailableTitle"></h2>
             <p data-i18n="mapUnavailableBody"></p>
           </div>
           <div class="map-empty" id="map-empty">
+            <div class="map-icon" aria-hidden="true">🗺️</div>
             <h2 data-i18n="mapEmptyTitle"></h2>
             <p data-i18n="mapEmptyBody"></p>
           </div>
@@ -550,110 +726,110 @@
         en: {
           productTitle: "MeetingSearch",
           tagline: "Find a brand branch that fits everyone.",
-          demoHint:
-            "Demo: look up 海淀区中关村, 望京, or 朝阳区三里屯, then pick a match.",
-          addParticipant: "Add Participant",
+          demoHint: "Demo: look up 海淀区中关村, 望京, or 朝阳区三里屯, then pick a match.",
+          addSection: "Add participants",
+          listSection: "Participants",
+          prefsSection: "Preferences",
           brand: "Brand",
           objective: "Proximity objective",
           objectiveTotal: "Total distance",
           objectiveMinimax: "Minimax",
           radius: "Radius (meters, optional)",
           radiusPlaceholder: "15000 (default)",
-          search: "Search",
-          lookupAddress: "Lookup",
-          label: "Label",
-          address: "Address",
+          search: "Find meeting place",
+          lookupAddress: "Search",
+          pickAddress: "Choose address",
+          cancel: "Cancel",
+          label: "Name",
+          labelPlaceholder: "Enter a name",
+          addressPlaceholder: "Search address (e.g. 三里屯)",
           remove: "Remove",
           langToggle: "中文",
+          apiConnected: "Map API connected",
+          apiOffline: "Map display offline",
+          peopleCount: (n) => `(${n})`,
+          listEmptyTitle: "No participants yet",
+          listEmptyBody: "Add at least 2 people",
           mapUnavailableTitle: "Map unavailable",
           mapUnavailableBody:
             "Set AMAP_JS_KEY (and AMAP_SECURITY_JS_CODE if required) in .env to show the 高德 map. Search still works without it.",
           mapEmptyTitle: "Ready when you are",
-          mapEmptyBody:
-            "Look up and pick a location for at least two Participants, then Search. Chosen locations appear on the map.",
+          mapEmptyBody: "Add at least two participants with chosen addresses, then search.",
           drawerCollapse: "Collapse",
           drawerRankingTitle: "Ranking",
           drawerEmptyTitle: "Empty candidate set",
           recommendation: "Recommendation",
-          needTwo: "At least two Participants are required.",
-          needAllResolved:
-            "Look up and choose a location for every Participant before searching.",
+          needTwo: "At least two participants are required.",
+          needName: "Enter a name before choosing an address.",
+          needAllResolved: "Add at least two participants before searching.",
           lookingUp: "Looking up address…",
           chooseMatch: "Choose one match below.",
           searching: "Searching…",
           noGeocode: (addr) => `No geocode match for “${addr}”. Try a different address.`,
           candidateLead: (addr) => `Matches for “${addr}”:`,
-          resolvedAs: (addr) => `Selected: ${addr}`,
           emptyHint:
             "Increase the radius or change the Brand above, then search again to recover from an Empty candidate set.",
           objectiveTotalShort: "total distance (sum)",
           objectiveMinimaxShort: "minimax (max Distance)",
-          scoreMeta: (score, objectiveLabel) =>
-            `score ${score} m (${objectiveLabel})`,
+          scoreMeta: (score, objectiveLabel) => `score ${score} m (${objectiveLabel})`,
           mapLoadError: "Could not load the 高德 map. Check AMAP_JS_KEY / security code.",
-          defaultParticipantLabel: (n) => `Participant ${n}`,
         },
         zh: {
           productTitle: "约了吗",
           tagline: "为大家找到合适的品牌分店。",
-          demoHint:
-            "演示：查找「海淀区中关村」「望京」或「朝阳区三里屯」，再从列表中选一项。",
-          addParticipant: "添加参与者",
+          demoHint: "演示：查找「海淀区中关村」「望京」或「朝阳区三里屯」，再从列表中选一项。",
+          addSection: "添加参与者",
+          listSection: "参与者列表",
+          prefsSection: "偏好设置",
           brand: "品牌",
           objective: "就近目标",
           objectiveTotal: "总距离最小",
           objectiveMinimax: "最远人最小",
           radius: "搜索半径（米，可选）",
           radiusPlaceholder: "15000（默认）",
-          search: "搜索",
-          lookupAddress: "查找",
-          label: "称呼",
-          address: "地址",
+          search: "开始寻找见面地点",
+          lookupAddress: "搜索",
+          pickAddress: "选择地址",
+          cancel: "取消",
+          label: "姓名",
+          labelPlaceholder: "请输入姓名",
+          addressPlaceholder: "搜索地址（如：三里屯）",
           remove: "移除",
           langToggle: "EN",
+          apiConnected: "已连接地图 API",
+          apiOffline: "地图显示未启用",
+          peopleCount: (n) => `（${n} 人）`,
+          listEmptyTitle: "还没有参与者",
+          listEmptyBody: "至少添加 2 人",
           mapUnavailableTitle: "地图未启用",
           mapUnavailableBody:
             "在 .env 中设置 AMAP_JS_KEY（如需要再设 AMAP_SECURITY_JS_CODE）即可显示高德地图。无地图时仍可搜索。",
           mapEmptyTitle: "准备好了就开始",
-          mapEmptyBody:
-            "至少为两位参与者查找并选定地址，然后搜索。选定的位置会显示在地图上。",
+          mapEmptyBody: "至少添加两位参与者并选定地址，然后搜索。选定的位置会显示在地图上。",
           drawerCollapse: "收起",
           drawerRankingTitle: "排序",
           drawerEmptyTitle: "无候选分店",
           recommendation: "推荐",
           needTwo: "至少需要两位参与者。",
-          needAllResolved: "请先为每位参与者查找并选定地址，再搜索。",
+          needName: "请先填写姓名，再选择地址。",
+          needAllResolved: "请先添加至少两位参与者，再搜索。",
           lookingUp: "正在查找地址…",
           chooseMatch: "请在下方选择一个匹配地址。",
           searching: "正在搜索…",
           noGeocode: (addr) => `找不到「${addr}」的匹配结果，请换一个地址。`,
           candidateLead: (addr) => `「${addr}」的匹配结果：`,
-          resolvedAs: (addr) => `已选：${addr}`,
           emptyHint: "加大搜索半径或更换品牌，然后再次搜索。",
           objectiveTotalShort: "总距离（求和）",
           objectiveMinimaxShort: "最远人最小（最大距离）",
-          scoreMeta: (score, objectiveLabel) =>
-            `得分 ${score} 米（${objectiveLabel}）`,
+          scoreMeta: (score, objectiveLabel) => `得分 ${score} 米（${objectiveLabel}）`,
           mapLoadError: "高德地图加载失败，请检查 AMAP_JS_KEY / 安全密钥。",
-          defaultParticipantLabel: (n) => `参与者 ${n}`,
         },
       };
-
-      const presets = [
-        { labelEn: "Haidian", labelZh: "海淀", address: "海淀区中关村" },
-        { labelEn: "Wangjing", labelZh: "望京", address: "望京" },
-        { labelEn: "Chaoyang", labelZh: "朝阳", address: "朝阳区三里屯" },
-      ];
-
-      function presetLabel(preset) {
-        return locale === "zh" ? preset.labelZh : preset.labelEn;
-      }
 
       const mapUi = window.__MAP_UI__ && typeof window.__MAP_UI__ === "object"
         ? window.__MAP_UI__
         : { jsKey: "", securityJsCode: "" };
 
-      const participantsEl = document.getElementById("participants");
       const form = document.getElementById("search-form");
       const statusEl = document.getElementById("status");
       const searchButton = document.getElementById("search-button");
@@ -665,18 +841,29 @@
       const mapEmptyEl = document.getElementById("map-empty");
       const productTitleEl = document.getElementById("product-title");
       const langToggleBtn = document.getElementById("lang-toggle");
+      const apiPill = document.getElementById("api-pill");
+      const apiPillText = document.getElementById("api-pill-text");
+      const listEl = document.getElementById("participant-list");
+      const listCountEl = document.getElementById("list-count");
+      const composerLabel = document.getElementById("composer-label");
+      const composerAddress = document.getElementById("composer-address");
+      const openPickerBtn = document.getElementById("open-address-picker");
+      const addressPicker = document.getElementById("address-picker");
+      const lookupBtn = document.getElementById("lookup-address");
+      const cancelPickerBtn = document.getElementById("cancel-picker");
+      const geocodePanel = document.getElementById("geocode-panel");
 
       /** @type {'en'|'zh'} */
       let locale = detectLocale();
-      /** Cached resolved Participants for Ranking / map. */
-      let lastResolved = null;
+      /** @type {Array<{ id: string, label: string, coordinates: {lat:number,lng:number}, formattedAddress: string }>} */
+      let participants = [];
       /** @type {null | { data: any, participants: any[] }} */
       let lastRanking = null;
       let selectedBranchIndex = 0;
       let searchInFlight = false;
-
-      /** @type {WeakMap<Element, { candidates: any[], selected: null | { coordinates: any, formattedAddress: string }, queriedAddress: string }>} */
-      const rowState = new WeakMap();
+      /** @type {any[]} */
+      let pendingCandidates = [];
+      let pendingQuery = "";
 
       /** @type {any} */
       let AMapNS = null;
@@ -709,6 +896,7 @@
         document.title = t("productTitle");
         productTitleEl.textContent = t("productTitle");
         langToggleBtn.textContent = t("langToggle");
+        updateApiPill();
 
         document.querySelectorAll("[data-i18n]").forEach((el) => {
           const key = el.getAttribute("data-i18n");
@@ -719,16 +907,22 @@
           if (key && "placeholder" in el) el.placeholder = t(key);
         });
 
-        participantsEl.querySelectorAll(".participant-block").forEach((block) => {
-          refreshParticipantBlockCopy(block);
-        });
-
+        renderParticipantList();
+        if (geocodePanel && !geocodePanel.hidden && pendingCandidates.length) {
+          renderCandidates(pendingQuery, pendingCandidates);
+        }
         if (drawerEl.classList.contains("open") && lastRanking) {
           openDrawer(
             t("drawerRankingTitle"),
             renderRanking(lastRanking.data, lastRanking.participants),
           );
         }
+      }
+
+      function updateApiPill() {
+        const online = Boolean((mapUi.jsKey || "").trim());
+        apiPill.classList.toggle("offline", !online);
+        apiPillText.textContent = online ? t("apiConnected") : t("apiOffline");
       }
 
       langToggleBtn.addEventListener("click", () => {
@@ -741,188 +935,115 @@
         applyI18n();
       });
 
-      function getRowState(block) {
-        let state = rowState.get(block);
-        if (!state) {
-          state = { candidates: [], selected: null, queriedAddress: "" };
-          rowState.set(block, state);
-        }
-        return state;
-      }
-
-      function participantBlocks() {
-        return [...participantsEl.querySelectorAll(".participant-block")];
-      }
-
-      function readParticipantDrafts() {
-        return participantBlocks().map((block, i) => ({
-          id: `p${i + 1}`,
-          label: block.querySelector('[name="label"]').value.trim(),
-          address: block.querySelector('[name="address"]').value.trim(),
-          block,
-        }));
-      }
-
-      function collectResolvedParticipants() {
-        return readParticipantDrafts().map((draft) => {
-          const selected = getRowState(draft.block).selected;
-          if (!selected) return null;
-          return {
-            id: draft.id,
-            label: draft.label,
-            coordinates: selected.coordinates,
-            formattedAddress: selected.formattedAddress,
-          };
-        });
-      }
-
-      function allParticipantsResolved() {
-        const drafts = readParticipantDrafts();
-        return (
-          drafts.length >= 2 &&
-          drafts.every((draft) => getRowState(draft.block).selected)
-        );
-      }
-
       function updateSearchGate() {
-        if (searchInFlight) {
-          searchButton.disabled = true;
-          return;
-        }
-        searchButton.disabled = !allParticipantsResolved();
-      }
-
-      function syncResolvedCache() {
-        const resolved = collectResolvedParticipants().filter(Boolean);
-        if (resolved.length === 0) {
-          lastResolved = null;
-          clearParticipantMarkers();
-          updateMapEmptyVisibility();
-          return;
-        }
-        lastResolved = { participants: resolved };
-        paintParticipantMarkers(resolved);
-        updateMapEmptyVisibility();
+        searchButton.disabled = searchInFlight || participants.length < 2;
       }
 
       function clearRankingResults() {
         lastRanking = null;
         clearBranchMarkers();
-        if (drawerEl.classList.contains("open")) {
-          closeDrawer();
-        }
+        if (drawerEl.classList.contains("open")) closeDrawer();
       }
 
-      function clearBlockResolution(block) {
-        const state = getRowState(block);
-        state.candidates = [];
-        state.selected = null;
-        state.queriedAddress = "";
-        const panel = block.querySelector(".geocode-panel");
-        const hint = block.querySelector(".resolved-hint");
-        if (panel) {
-          panel.innerHTML = "";
-          panel.hidden = true;
-        }
-        if (hint) {
-          hint.textContent = "";
-          hint.hidden = true;
-        }
-      }
-
-      function refreshParticipantBlockCopy(block) {
-        const labelSpan = block.querySelector('[data-field="label"]');
-        const addressSpan = block.querySelector('[data-field="address"]');
-        const removeBtn = block.querySelector(".remove");
-        const lookupBtn = block.querySelector(".lookup");
-        if (labelSpan) labelSpan.textContent = t("label");
-        if (addressSpan) addressSpan.textContent = t("address");
-        if (removeBtn) removeBtn.textContent = t("remove");
-        if (lookupBtn) lookupBtn.textContent = t("lookupAddress");
-
-        const state = getRowState(block);
-        const hint = block.querySelector(".resolved-hint");
-        if (hint && state.selected) {
-          hint.textContent = t("resolvedAs", state.selected.formattedAddress);
-          hint.hidden = false;
-        }
-        const panel = block.querySelector(".geocode-panel");
-        if (panel && !panel.hidden && state.candidates.length > 0) {
-          renderInlineCandidates(block, state.queriedAddress, state.candidates, state.selected);
-        }
-      }
-
-      function addParticipantRow(preset) {
-        const block = document.createElement("div");
-        block.className = "participant-block";
-        const initialLabel =
-          preset && (preset.labelEn || preset.labelZh)
-            ? presetLabel(preset)
-            : (preset?.label ?? "");
-        block.innerHTML = `
-          <div class="participant-row">
-            <label><span data-field="label">${escapeHtml(t("label"))}</span>
-              <input name="label" value="${escapeAttr(initialLabel)}" required />
-            </label>
-            <label><span data-field="address">${escapeHtml(t("address"))}</span>
-              <input name="address" value="${escapeAttr(preset?.address ?? "")}" required />
-            </label>
-            <div class="participant-actions">
-              <button type="button" class="lookup">${escapeHtml(t("lookupAddress"))}</button>
-              <button type="button" class="remove">${escapeHtml(t("remove"))}</button>
-            </div>
-          </div>
-          <div class="geocode-panel" hidden></div>
-          <p class="resolved-hint" hidden></p>
-        `;
-        rowState.set(block, { candidates: [], selected: null, queriedAddress: "" });
-
-        block.querySelector(".remove").addEventListener("click", () => {
-          if (participantBlocks().length <= 2) {
-            statusEl.textContent = t("needTwo");
-            return;
-          }
-          block.remove();
-          clearRankingResults();
-          syncResolvedCache();
-          updateSearchGate();
-        });
-
-        block.querySelector('[name="address"]').addEventListener("input", () => {
-          clearBlockResolution(block);
-          clearRankingResults();
-          syncResolvedCache();
-          updateSearchGate();
-          statusEl.textContent = "";
-        });
-
-        block.querySelector('[name="label"]').addEventListener("input", () => {
-          syncResolvedCache();
-        });
-
-        block.querySelector(".lookup").addEventListener("click", () => {
-          void lookupAddressForBlock(block);
-        });
-
-        participantsEl.appendChild(block);
+      function syncMapFromParticipants() {
+        paintParticipantMarkers(participants);
+        updateMapEmptyVisibility();
         updateSearchGate();
       }
 
-      async function lookupAddressForBlock(block) {
-        const addressInput = block.querySelector('[name="address"]');
-        const address = addressInput.value.trim();
-        if (!address) {
-          addressInput.focus();
+      function renderParticipantList() {
+        listCountEl.textContent = t("peopleCount", participants.length);
+        if (participants.length === 0) {
+          listEl.innerHTML = `
+            <div class="list-empty">
+              <div class="icon" aria-hidden="true">👥</div>
+              <p>${escapeHtml(t("listEmptyTitle"))}</p>
+              <p>${escapeHtml(t("listEmptyBody"))}</p>
+            </div>`;
           return;
         }
 
-        const lookupBtn = block.querySelector(".lookup");
+        listEl.innerHTML = participants
+          .map(
+            (p, index) => `
+            <div class="participant-item" data-index="${index}">
+              <strong>${escapeHtml(p.label)}</strong>
+              <button type="button" class="remove" data-index="${index}">${escapeHtml(t("remove"))}</button>
+              <div class="addr">${escapeHtml(p.formattedAddress)}</div>
+            </div>`,
+          )
+          .join("");
+      }
+
+      listEl.addEventListener("click", (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) return;
+        if (!target.classList.contains("remove")) return;
+        const index = Number(target.dataset.index);
+        if (!Number.isFinite(index)) return;
+        participants.splice(index, 1);
+        participants = participants.map((p, i) => ({ ...p, id: `p${i + 1}` }));
+        clearRankingResults();
+        renderParticipantList();
+        syncMapFromParticipants();
+        statusEl.textContent = "";
+      });
+
+      function openAddressPicker() {
+        const name = composerLabel.value.trim();
+        if (!name) {
+          statusEl.textContent = t("needName");
+          composerLabel.focus();
+          return;
+        }
+        openPickerBtn.hidden = true;
+        addressPicker.hidden = false;
+        composerAddress.value = "";
+        geocodePanel.hidden = true;
+        geocodePanel.innerHTML = "";
+        pendingCandidates = [];
+        pendingQuery = "";
+        composerAddress.focus();
+      }
+
+      function closeAddressPicker() {
+        addressPicker.hidden = true;
+        openPickerBtn.hidden = false;
+        geocodePanel.hidden = true;
+        geocodePanel.innerHTML = "";
+        pendingCandidates = [];
+        pendingQuery = "";
+        composerAddress.value = "";
+      }
+
+      openPickerBtn.addEventListener("click", openAddressPicker);
+      cancelPickerBtn.addEventListener("click", () => {
+        closeAddressPicker();
+        statusEl.textContent = "";
+      });
+
+      lookupBtn.addEventListener("click", () => {
+        void lookupAddress();
+      });
+      composerAddress.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          void lookupAddress();
+        }
+      });
+
+      async function lookupAddress() {
+        const address = composerAddress.value.trim();
+        if (!address) {
+          composerAddress.focus();
+          return;
+        }
         lookupBtn.disabled = true;
         statusEl.textContent = t("lookingUp");
-        clearBlockResolution(block);
-        clearRankingResults();
-        syncResolvedCache();
-        updateSearchGate();
+        geocodePanel.hidden = true;
+        geocodePanel.innerHTML = "";
+        pendingCandidates = [];
+        pendingQuery = address;
 
         try {
           const res = await fetch("/api/geocode", {
@@ -939,109 +1060,76 @@
             statusEl.textContent = t("noGeocode", address);
             return;
           }
-
-          const state = getRowState(block);
-          state.candidates = candidates;
-          state.queriedAddress = address;
-          state.selected = null;
-          renderInlineCandidates(block, address, candidates, null);
+          pendingCandidates = candidates;
+          renderCandidates(address, candidates);
           statusEl.textContent = t("chooseMatch");
         } catch (err) {
           statusEl.textContent = err.message ?? String(err);
         } finally {
           lookupBtn.disabled = false;
-          updateSearchGate();
         }
       }
 
-      function renderInlineCandidates(block, address, candidates, selected) {
-        const panel = block.querySelector(".geocode-panel");
-        if (!block.dataset.uid) {
-          block.dataset.uid = `row-${Math.random().toString(36).slice(2, 9)}`;
-        }
-        const radioName = `geocode-${block.dataset.uid}`;
-        const selectedKey = selected
-          ? `${selected.coordinates.lat},${selected.coordinates.lng}`
-          : "";
-
-        panel.innerHTML = `
+      function renderCandidates(address, candidates) {
+        geocodePanel.innerHTML = `
           <p class="candidate-lead">${escapeHtml(t("candidateLead", address))}</p>
           ${candidates
             .map((c, i) => {
-              const key = `${c.coordinates.lat},${c.coordinates.lng}`;
-              const isSelected = key === selectedKey;
+              const title = c.name || c.formattedAddress;
+              const sub =
+                c.name && c.formattedAddress && c.name !== c.formattedAddress
+                  ? c.formattedAddress
+                  : "";
               return `
-              <label class="choice ${isSelected ? "selected" : ""}">
-                <input type="radio" name="${radioName}" value="${i}" ${isSelected ? "checked" : ""} />
-                <span>${escapeHtml(c.formattedAddress)}</span>
+              <label class="choice">
+                <input type="radio" name="geocode-pick" value="${i}" />
+                <span>
+                  ${escapeHtml(title)}
+                  ${sub ? `<span class="sub">${escapeHtml(sub)}</span>` : ""}
+                </span>
               </label>`;
             })
             .join("")}
         `;
-        panel.hidden = false;
-
-        panel.querySelectorAll('input[type="radio"]').forEach((input) => {
+        geocodePanel.hidden = false;
+        geocodePanel.querySelectorAll('input[type="radio"]').forEach((input) => {
           input.addEventListener("change", () => {
             const index = Number(input.value);
             const chosen = candidates[index];
             if (!chosen) return;
-            selectCandidate(block, chosen);
+            addParticipantFromCandidate(chosen);
           });
         });
       }
 
-      function selectCandidate(block, chosen) {
-        const state = getRowState(block);
-        state.selected = {
+      function addParticipantFromCandidate(chosen) {
+        const label = composerLabel.value.trim() || t("label");
+        participants.push({
+          id: `p${participants.length + 1}`,
+          label,
           coordinates: chosen.coordinates,
           formattedAddress: chosen.formattedAddress,
-        };
-        const hint = block.querySelector(".resolved-hint");
-        hint.textContent = t("resolvedAs", chosen.formattedAddress);
-        hint.hidden = false;
-
-        const panel = block.querySelector(".geocode-panel");
-        panel.querySelectorAll(".choice").forEach((el) => {
-          const radio = el.querySelector("input");
-          el.classList.toggle("selected", Boolean(radio && radio.checked));
         });
-
+        composerLabel.value = "";
+        closeAddressPicker();
         clearRankingResults();
-        syncResolvedCache();
-        updateSearchGate();
-        statusEl.textContent = allParticipantsResolved() ? "" : t("needAllResolved");
+        renderParticipantList();
+        syncMapFromParticipants();
+        statusEl.textContent = "";
       }
-
-      addParticipantRow(presets[0]);
-      addParticipantRow(presets[1]);
-
-      document.getElementById("add-participant").addEventListener("click", () => {
-        const next = presets[participantBlocks().length] ?? {
-          label: t("defaultParticipantLabel", participantBlocks().length + 1),
-          address: "",
-        };
-        addParticipantRow(next);
-        clearRankingResults();
-        updateSearchGate();
-      });
-
-      drawerCloseBtn.addEventListener("click", () => {
-        closeDrawer();
-      });
 
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
-        if (!allParticipantsResolved()) {
+        if (participants.length < 2) {
           statusEl.textContent = t("needAllResolved");
           updateSearchGate();
           return;
         }
-
-        const participants = collectResolvedParticipants();
-        lastResolved = { participants };
         statusEl.textContent = t("searching");
         await runSearch(participants);
       });
+
+      drawerCloseBtn.addEventListener("click", () => closeDrawer());
 
       function openDrawer(title, html) {
         drawerTitleEl.textContent = title;
@@ -1058,7 +1146,6 @@
       drawerBodyEl.addEventListener("click", (event) => {
         const target = event.target;
         if (!(target instanceof HTMLElement)) return;
-
         const entryBtn = target.closest(".entry");
         if (entryBtn instanceof HTMLElement && entryBtn.dataset.rankIndex != null) {
           const index = Number(entryBtn.dataset.rankIndex);
@@ -1066,7 +1153,7 @@
         }
       });
 
-      async function runSearch(participants) {
+      async function runSearch(people) {
         statusEl.textContent = t("searching");
         searchInFlight = true;
         updateSearchGate();
@@ -1074,7 +1161,7 @@
         const fd = new FormData(form);
         const radiusRaw = fd.get("radiusMeters");
         const payload = {
-          participants: participants.map(({ id, label, coordinates }) => ({
+          participants: people.map(({ id, label, coordinates }) => ({
             id,
             label,
             coordinates,
@@ -1113,10 +1200,10 @@
           }
 
           statusEl.textContent = "";
-          lastRanking = { data, participants };
+          lastRanking = { data, participants: people };
           selectedBranchIndex = 0;
           paintBranchMarkers(data.entries);
-          openDrawer(t("drawerRankingTitle"), renderRanking(data, participants));
+          openDrawer(t("drawerRankingTitle"), renderRanking(data, people));
           selectBranch(0, true);
         } catch (err) {
           statusEl.textContent = err.message ?? String(err);
@@ -1134,16 +1221,16 @@
           </div>`;
       }
 
-      function labelById(participants) {
+      function labelById(people) {
         const mapLabels = Object.create(null);
-        for (const p of participants) {
+        for (const p of people) {
           mapLabels[p.id] = p.label || p.id;
         }
         return mapLabels;
       }
 
-      function renderRanking(data, participants) {
-        const labels = labelById(participants ?? lastResolved?.participants ?? []);
+      function renderRanking(data, people) {
+        const labels = labelById(people ?? participants);
         const objectiveLabel =
           data.objective === "minimax"
             ? t("objectiveMinimaxShort")
@@ -1204,10 +1291,6 @@
           .replaceAll('"', "&quot;");
       }
 
-      function escapeAttr(value) {
-        return escapeHtml(value);
-      }
-
       function lngLat(coords) {
         return [coords.lng, coords.lat];
       }
@@ -1239,21 +1322,19 @@
       }
 
       function updateMapEmptyVisibility() {
-        const hasPeople =
-          participantMarkers.length > 0 ||
-          (lastResolved && lastResolved.participants.length > 0);
+        const hasPeople = participants.length > 0;
         mapEmptyEl.classList.toggle("hidden", Boolean(hasPeople) || !map);
       }
 
-      function paintParticipantMarkers(participants) {
+      function paintParticipantMarkers(people) {
         if (!map || !AMapNS) return;
         clearParticipantMarkers();
-        for (const p of participants) {
+        for (const p of people) {
           const marker = new AMapNS.Marker({
             position: lngLat(p.coordinates),
             title: p.label,
             label: {
-              content: `<span style="padding:2px 6px;background:#fff;border:1px solid #0f6b5c;color:#0f6b5c;font-size:12px;">${escapeHtml(p.label)}</span>`,
+              content: `<span style="padding:2px 6px;background:#fff;border:1px solid #059669;color:#047857;font-size:12px;border-radius:6px;">${escapeHtml(p.label)}</span>`,
               direction: "top",
             },
           });
@@ -1299,10 +1380,10 @@
       }
 
       function branchLabelHtml(name, isTop, selected) {
-        const bg = selected ? "#0f6b5c" : isTop ? "#e6f3f0" : "#fff";
-        const fg = selected ? "#fff" : "#1a1f2e";
+        const bg = selected ? "#059669" : isTop ? "#ecfdf5" : "#fff";
+        const fg = selected ? "#fff" : "#1f2937";
         const weight = isTop || selected ? "600" : "400";
-        return `<span style="padding:2px 6px;background:${bg};color:${fg};border:1px solid #0f6b5c;font-size:12px;font-weight:${weight};">${escapeHtml(name)}</span>`;
+        return `<span style="padding:2px 6px;background:${bg};color:${fg};border:1px solid #059669;font-size:12px;font-weight:${weight};border-radius:6px;">${escapeHtml(name)}</span>`;
       }
 
       function refreshBranchMarkerLabels() {
@@ -1388,8 +1469,10 @@
       }
 
       applyI18n();
+      updateSearchGate();
       loadAmap().then(() => {
         updateMapEmptyVisibility();
+        updateApiPill();
       });
     </script>
   </body>

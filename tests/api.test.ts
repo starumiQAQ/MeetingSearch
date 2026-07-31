@@ -179,7 +179,7 @@ describe("local web API", () => {
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).toContain("MeetingSearch");
-    expect(html).toContain('name="address"');
+    expect(html).toContain("composer-address");
     expect(html).toContain("/api/geocode");
     expect(html).toContain("/api/search");
     expect(html).toContain("map_provider_error");
@@ -193,38 +193,37 @@ describe("local web API", () => {
     expect(res.status).toBe(200);
     const html = await res.text();
 
-    // Per-row Lookup → inline Geocode candidates (always pick, including unique)
-    expect(html).toContain('class="lookup"');
+    // Midpoint-style composer: name → choose address → search → pick → list
+    expect(html).toContain("pickAddress");
     expect(html).toContain("lookupAddress");
+    expect(html).toContain("address-picker");
     expect(html).toContain("geocode-panel");
+    expect(html).toContain("participant-list");
     expect(html).toContain("updateSearchGate");
     expect(html).toContain("needAllResolved");
-    expect(html).not.toContain("pendingAmbiguous");
-    expect(html).not.toContain("continueSearch");
+    expect(html).toContain("addParticipantFromCandidate");
 
     // Organizer prefs + Empty candidate set recovery
-    expect(html).toContain("Add Participant");
-    expect(html).toContain('class="remove"');
+    expect(html).toContain("Add participants");
     expect(html).toContain('name="objective"');
     expect(html).toContain('name="radiusMeters"');
     expect(html).toContain("Recommendation");
-    expect(html).toContain("lastResolved");
     expect(html).toContain("labelById");
     expect(html).toMatch(/increasing the radius|increase the radius/i);
     expect(html).toMatch(/changing the Brand|change the Brand/i);
 
-    // Sidebar–map gap
-    expect(html).toMatch(/\.layout\s*\{[^}]*gap:\s*0\.875rem/s);
+    // Card layout gap between side and map
+    expect(html).toMatch(/\.layout\s*\{[^}]*gap:\s*1rem/s);
 
-    // Chinese UI fully localized (no English domain leftovers in zh strings)
+    // Chinese UI fully localized
     expect(html).toContain("添加参与者");
+    expect(html).toContain("选择地址");
     expect(html).toContain("就近目标");
     expect(html).toContain("无候选分店");
     expect(html).toContain("为大家找到合适的品牌分店。");
-    expect(html).toContain("查找");
+    expect(html).toContain("参与者列表");
     expect(html).not.toContain("添加 Participant");
     expect(html).not.toContain("为大家找到合适的 Brand Branch");
-    expect(html).not.toContain("最远人最小（minimax）");
     expect(html).toContain('drawerEmptyTitle: "无候选分店"');
     expect(html).toContain('objective: "就近目标"');
   });

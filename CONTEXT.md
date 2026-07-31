@@ -9,7 +9,7 @@ One plausible match returned when resolving a Participant's free-text address. T
 _Avoid_: Autocomplete suggestion, POI (when meaning an address match)
 
 **Participant**:
-A person whose location is an input to the meeting search. Their location starts as free-text address and is resolved in a step separate from Ranking: the user geocodes that address and chooses one Geocode candidate before the Participant is ready for Ranking.
+A person whose location is an input to the meeting search. The organizer enters a name, looks up a free-text address, and chooses one Geocode candidate; only then is the Participant added and ready for Ranking.
 _Avoid_: User, friend, member
 
 **Brand**:

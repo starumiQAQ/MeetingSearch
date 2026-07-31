@@ -188,21 +188,45 @@ describe("local web API", () => {
     expect(html).not.toContain('name="lng"');
   });
 
-  it("serves organizer UX for edit group, re-rank, and Empty candidate set recovery (#5)", async () => {
+  it("serves per-participant address lookup, Ranking gate, layout gap, and zh UI copy", async () => {
     const res = await fetch(`${baseUrl}/`);
     expect(res.status).toBe(200);
     const html = await res.text();
 
+    // Per-row Lookup → inline Geocode candidates (always pick, including unique)
+    expect(html).toContain('class="lookup"');
+    expect(html).toContain("lookupAddress");
+    expect(html).toContain("geocode-panel");
+    expect(html).toContain("updateSearchGate");
+    expect(html).toContain("needAllResolved");
+    expect(html).not.toContain("pendingAmbiguous");
+    expect(html).not.toContain("continueSearch");
+
+    // Organizer prefs + Empty candidate set recovery
     expect(html).toContain("Add Participant");
     expect(html).toContain('class="remove"');
     expect(html).toContain('name="objective"');
     expect(html).toContain('name="radiusMeters"');
     expect(html).toContain("Recommendation");
     expect(html).toContain("lastResolved");
-    expect(html).toContain("participantFingerprint");
     expect(html).toContain("labelById");
     expect(html).toMatch(/increasing the radius|increase the radius/i);
     expect(html).toMatch(/changing the Brand|change the Brand/i);
+
+    // Sidebar–map gap
+    expect(html).toMatch(/\.layout\s*\{[^}]*gap:\s*0\.875rem/s);
+
+    // Chinese UI fully localized (no English domain leftovers in zh strings)
+    expect(html).toContain("添加参与者");
+    expect(html).toContain("就近目标");
+    expect(html).toContain("无候选分店");
+    expect(html).toContain("为大家找到合适的品牌分店。");
+    expect(html).toContain("查找");
+    expect(html).not.toContain("添加 Participant");
+    expect(html).not.toContain("为大家找到合适的 Brand Branch");
+    expect(html).not.toContain("最远人最小（minimax）");
+    expect(html).toContain('drawerEmptyTitle: "无候选分店"');
+    expect(html).toContain('objective: "就近目标"');
   });
 });
 

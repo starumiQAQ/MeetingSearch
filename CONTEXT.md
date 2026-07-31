@@ -4,8 +4,12 @@ Find a brand's nearby branch that best fits a group of people who need to meet.
 
 ## Language
 
+**Geocode candidate**:
+One plausible match returned when resolving a Participant's free-text address. The user must choose exactly one before that Participant is ready for Ranking.
+_Avoid_: Autocomplete suggestion, POI (when meaning an address match)
+
 **Participant**:
-A person whose location is an input to the meeting search. Their location is given as free-text address and resolved via geocoding. When geocoding returns multiple plausible matches, one must be chosen before the search continues.
+A person whose location is an input to the meeting search. Their location starts as free-text address and is resolved in a step separate from Ranking: the user geocodes that address and chooses one Geocode candidate before the Participant is ready for Ranking.
 _Avoid_: User, friend, member
 
 **Brand**:
@@ -29,7 +33,7 @@ The Branches considered for a search: the union of Brand POI results around ever
 _Avoid_: Search results, nearby stores (without saying how they were gathered)
 
 **Ranking**:
-The Candidate set ordered by the chosen Proximity objective, with per-Participant Distances shown. The top Branch is the meeting recommendation.
+The Candidate set ordered by the chosen Proximity objective, with per-Participant Distances shown. The top Branch is the meeting recommendation. Ranking runs only after every Participant has a chosen Geocode candidate.
 _Avoid_: Winner-only result, best store (without the ordered list)
 
 **Empty candidate set**:

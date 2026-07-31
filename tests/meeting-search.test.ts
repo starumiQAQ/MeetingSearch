@@ -284,4 +284,75 @@ describe("MeetingSearch", () => {
     );
     expect(ids).toHaveLength(3);
   });
+
+  it("deduplicates co-located Participant centers and Distance calls", async () => {
+    const same: Participant = {
+      id: "same",
+      label: "Same place",
+      coordinates: { lat: 39.9, lng: 116.4 },
+    };
+    const map = new FakeMapProvider({
+      branchesByBrand: { [brand]: [branchNearAlice] },
+    });
+    map.setDrivingDistance(
+      alice.coordinates,
+      branchNearAlice.coordinates,
+      1000,
+    );
+
+    const result = await meetingSearch(
+      {
+        participants: [alice, same],
+        brand,
+        objective: "total_distance",
+      },
+      map,
+    );
+
+    expect(isEmptyCandidateSet(result)).toBe(false);
+    if (isEmptyCandidateSet(result)) return;
+
+    // Both Participants and the geometric center are the same point:
+    // one Branch search and one driving call serve all of them.
+    expect(map.searchCalls).toHaveLength(1);
+    expect(map.distanceCalls).toHaveLength(1);
+    expect(result.entries[0].distances).toEqual({ alice: 1000, same: 1000 });
+    expect(result.entries[0].score).toBe(2000);
+  });
+
+  it("skips the Distance call when a Branch sits at a Participant's own point", async () => {
+    const atBranch: Participant = {
+      id: "at-branch",
+      label: "At the branch",
+      coordinates: { ...branchNearAlice.coordinates },
+    };
+    const map = new FakeMapProvider({
+      branchesByBrand: { [brand]: [branchNearAlice] },
+    });
+    map.setDrivingDistance(
+      alice.coordinates,
+      branchNearAlice.coordinates,
+      1000,
+    );
+
+    const result = await meetingSearch(
+      {
+        participants: [alice, atBranch],
+        brand,
+        objective: "total_distance",
+      },
+      map,
+    );
+
+    expect(isEmptyCandidateSet(result)).toBe(false);
+    if (isEmptyCandidateSet(result)) return;
+
+    expect(map.distanceCalls).toHaveLength(1);
+    expect(map.distanceCalls[0]).toEqual({
+      from: alice.coordinates,
+      to: branchNearAlice.coordinates,
+    });
+    expect(result.entries[0].distances).toEqual({ alice: 1000, "at-branch": 0 });
+    expect(result.entries[0].score).toBe(1000);
+  });
 });

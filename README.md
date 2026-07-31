@@ -39,6 +39,8 @@ Enter free-text Participant addresses. The page geocodes via `POST /api/geocode`
 
 Response: `{ "candidates": [ { "formattedAddress": "...", "coordinates": { "lat": 39.99, "lng": 116.47 } } ] }` — zero, one, or many candidates.
 
+Repeated lookups for the same address are served from an in-memory cache (5-minute TTL); the cache is cleared automatically whenever Service settings swap the MapProvider.
+
 `POST /api/search`
 
 ```json

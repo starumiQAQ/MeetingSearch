@@ -373,6 +373,126 @@ describe("GET / map UI config injection", () => {
   });
 });
 
+describe("request body limits and JSON validation", () => {
+  const app = createApp({ mapProvider: new FakeMapProvider(), port: 0 });
+  let baseUrl = "";
+
+  beforeAll(async () => {
+    await app.start();
+    const address = app.server.address();
+    if (!address || typeof address === "string") {
+      throw new Error("expected TCP address");
+    }
+    baseUrl = `http://127.0.0.1:${address.port}`;
+  });
+
+  afterAll(async () => {
+    await app.stop();
+  });
+
+  it("rejects malformed JSON with 400 instead of 500", async () => {
+    const res = await fetch(`${baseUrl}/api/search`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{not-json",
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/JSON/i);
+  });
+
+  it("rejects request bodies over 1 MiB with 413", async () => {
+    const res = await fetch(`${baseUrl}/api/geocode`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ address: "x".repeat(1_100_000) }),
+    });
+
+    expect(res.status).toBe(413);
+    const body = await res.json();
+    expect(body.error).toMatch(/too large/i);
+  });
+});
+
+describe("geocode caching", () => {
+  it("serves repeated addresses from memory and clears on provider swap", async () => {
+    const firstMap = new FakeMapProvider({
+      geocodeResults: { 望京: [uniqueHit] },
+    });
+    const secondMap = new FakeMapProvider({
+      geocodeResults: { 望京: [ambiguousA] },
+    });
+    const app = createApp({
+      mapProvider: firstMap,
+      port: 0,
+      geocodeCacheTtlMs: 60_000,
+    });
+    await app.start();
+    try {
+      const address = app.server.address();
+      if (!address || typeof address === "string") {
+        throw new Error("expected TCP address");
+      }
+      const baseUrl = `http://127.0.0.1:${address.port}`;
+      const lookup = () =>
+        fetch(`${baseUrl}/api/geocode`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ address: "望京" }),
+        }).then((res) => res.json());
+
+      expect((await lookup()).candidates).toEqual([uniqueHit]);
+      expect((await lookup()).candidates).toEqual([uniqueHit]);
+      expect(firstMap.geocodeCalls).toHaveLength(1);
+
+      app.replaceMapServices({ mapProvider: secondMap });
+
+      expect((await lookup()).candidates).toEqual([ambiguousA]);
+      expect(secondMap.geocodeCalls).toHaveLength(1);
+    } finally {
+      await app.stop();
+    }
+  });
+
+  it("expires cached geocode results after the TTL", async () => {
+    const map = new FakeMapProvider({
+      geocodeResults: { 望京: [uniqueHit] },
+    });
+    let now = 0;
+    const app = createApp({
+      mapProvider: map,
+      port: 0,
+      geocodeCacheTtlMs: 1_000,
+      geocodeCacheNow: () => now,
+    });
+    await app.start();
+    try {
+      const address = app.server.address();
+      if (!address || typeof address === "string") {
+        throw new Error("expected TCP address");
+      }
+      const baseUrl = `http://127.0.0.1:${address.port}`;
+      const lookup = () =>
+        fetch(`${baseUrl}/api/geocode`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ address: "望京" }),
+        });
+
+      await lookup();
+      await lookup();
+      expect(map.geocodeCalls).toHaveLength(1);
+
+      now = 2_000;
+      await lookup();
+      expect(map.geocodeCalls).toHaveLength(2);
+    } finally {
+      await app.stop();
+    }
+  });
+});
+
 describe("createApp replaceable MapProvider and MapUi", () => {
   const firstHit: GeocodeCandidate = {
     formattedAddress: "第一家地址",

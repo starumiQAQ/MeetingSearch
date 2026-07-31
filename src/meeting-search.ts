@@ -7,6 +7,7 @@ import {
   type MapProvider,
   type MeetingSearchInput,
   type MeetingSearchResult,
+  type Participant,
   type RankingEntry,
 } from "./types.js";
 
@@ -25,7 +26,9 @@ export async function meetingSearch(
 
   const radiusMeters = input.radiusMeters ?? DEFAULT_RADIUS_METERS;
   const concurrency = input.concurrency ?? DEFAULT_AMAP_CONCURRENCY;
-  const centers = searchCenters(input.participants.map((p) => p.coordinates));
+  const centers = dedupeCoordinates(
+    searchCenters(input.participants.map((p) => p.coordinates)),
+  );
 
   const batches = await mapPool(centers, concurrency, (near) =>
     map.searchBranches({
@@ -45,24 +48,44 @@ export async function meetingSearch(
     };
   }
 
-  const pairJobs = candidates.flatMap((branch) =>
-    input.participants.map((participant) => ({ branch, participant })),
-  );
+  // One driving call per unique (Participant, Branch) coordinate pair.
+  // Co-located Participants share a call; a Branch at a Participant's own
+  // point is distance 0 without calling 高德 at all.
+  const pairJobs: Array<{ branch: Branch; participant: Participant }> = [];
+  const pairIndex = new Map<string, number>();
+  for (const branch of candidates) {
+    for (const participant of input.participants) {
+      const fromKey = coordinateKey(participant.coordinates);
+      const toKey = coordinateKey(branch.coordinates);
+      if (fromKey === toKey) continue;
+      const pairKey = `${fromKey}->${toKey}`;
+      if (!pairIndex.has(pairKey)) {
+        pairIndex.set(pairKey, pairJobs.length);
+        pairJobs.push({ branch, participant });
+      }
+    }
+  }
   const pairDistances = await mapPool(pairJobs, concurrency, ({ branch, participant }) =>
     map.drivingDistance(participant.coordinates, branch.coordinates),
   );
 
-  const distanceByKey = new Map<string, number>();
+  const distanceByPair = new Map<string, number>();
   for (const [i, job] of pairJobs.entries()) {
-    distanceByKey.set(`${job.branch.id}:${job.participant.id}`, pairDistances[i]!);
+    distanceByPair.set(
+      `${coordinateKey(job.participant.coordinates)}->${coordinateKey(job.branch.coordinates)}`,
+      pairDistances[i]!,
+    );
   }
 
   const entries: RankingEntry[] = candidates.map((branch) => {
     const distances: Record<string, number> = {};
     for (const participant of input.participants) {
-      distances[participant.id] = distanceByKey.get(
-        `${branch.id}:${participant.id}`,
-      )!;
+      const fromKey = coordinateKey(participant.coordinates);
+      const toKey = coordinateKey(branch.coordinates);
+      distances[participant.id] =
+        fromKey === toKey
+          ? 0
+          : distanceByPair.get(`${fromKey}->${toKey}`)!;
     }
     const values = Object.values(distances);
     const score =
@@ -105,4 +128,22 @@ function dedupeBranches(branches: Branch[]): Branch[] {
     }
   }
   return [...byId.values()];
+}
+
+/** Drop search centers that are effectively the same point (~0.1 m). */
+function dedupeCoordinates(coords: Coordinates[]): Coordinates[] {
+  const seen = new Set<string>();
+  const unique: Coordinates[] = [];
+  for (const c of coords) {
+    const key = coordinateKey(c);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(c);
+  }
+  return unique;
+}
+
+/** Round to 6 decimals (~0.1 m) so near-identical points share API results. */
+function coordinateKey(c: Coordinates): string {
+  return `${c.lat.toFixed(6)},${c.lng.toFixed(6)}`;
 }

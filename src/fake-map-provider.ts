@@ -18,6 +18,7 @@ export class FakeMapProvider implements MapProvider {
     near: Coordinates;
     radiusMeters: number;
   }> = [];
+  readonly distanceCalls: Array<{ from: Coordinates; to: Coordinates }> = [];
   readonly geocodeCalls: string[] = [];
 
   constructor(options?: {
@@ -53,6 +54,7 @@ export class FakeMapProvider implements MapProvider {
     from: Coordinates,
     to: Coordinates,
   ): Promise<number> {
+    this.distanceCalls.push({ from: { ...from }, to: { ...to } });
     const key = distanceKey(from, to);
     const value = this.distances.get(key);
     if (value === undefined) {

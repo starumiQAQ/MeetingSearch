@@ -15,6 +15,7 @@ import {
   DEFAULT_AMAP_QPS,
   isEmptyCandidateSet,
   isMapProviderError,
+  type GeocodeCandidate,
 } from "./types.js";
 import type { ServiceEnvKey } from "./env-file.js";
 
@@ -22,6 +23,13 @@ export type { MapUiConfig } from "./map-services.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PORT = Number(process.env.PORT ?? 3000);
+const DEFAULT_GEOCODE_CACHE_TTL_MS = 5 * 60_000;
+const MAX_REQUEST_BODY_BYTES = 1_048_576;
+
+type GeocodeCacheEntry = {
+  expiresAt: number;
+  candidates: GeocodeCandidate[];
+};
 
 export type AppDeps = {
   mapProvider: MapProvider;
@@ -33,6 +41,13 @@ export type AppDeps = {
   serviceEnv?: MapServicesEnv;
   /** Override MapProvider/MapUi builder (tests inject fakes). */
   buildMapServices?: (env: MapServicesEnv) => MapServicesFromEnv;
+  /**
+   * How long repeated geocode lookups are served from memory (ms).
+   * Cleared automatically whenever the MapProvider is swapped. Default 5 min.
+   */
+  geocodeCacheTtlMs?: number;
+  /** Clock override for cache expiry (tests inject a fake). */
+  geocodeCacheNow?: () => number;
 };
 
 /** Partial hot-swap; omitted fields keep their current values. */
@@ -52,6 +67,10 @@ export function createApp(deps: AppDeps) {
   const envFilePath = deps.envFilePath ?? resolve(process.cwd(), ".env");
   const serviceEnv: MapServicesEnv = { ...(deps.serviceEnv ?? {}) };
   const buildMapServices = deps.buildMapServices ?? buildMapServicesFromEnv;
+  const geocodeCacheTtlMs =
+    deps.geocodeCacheTtlMs ?? DEFAULT_GEOCODE_CACHE_TTL_MS;
+  const now = deps.geocodeCacheNow ?? Date.now;
+  const geocodeCache = new Map<string, GeocodeCacheEntry>();
 
   const server = createServer(async (req, res) => {
     // Capture at request start so a mid-flight swap does not tear down in-flight work.
@@ -131,6 +150,7 @@ export function createApp(deps: AppDeps) {
   function applyBuiltServices(built: MapServicesFromEnv): void {
     mapProvider = built.mapProvider;
     mapUi = built.mapUi;
+    geocodeCache.clear();
   }
 
   function jsCredentialsFingerprint(env: MapServicesEnv): string {
@@ -224,6 +244,28 @@ export function createApp(deps: AppDeps) {
     writeJson(res, 200, { ...readServiceSettings(), reloadRequired });
   }
 
+  async function handleGeocode(
+    req: IncomingMessage,
+    res: ServerResponse,
+    map: MapProvider,
+  ): Promise<void> {
+    const body = await readJsonBody(req);
+    const address = parseGeocodeAddress(body);
+    const cached = geocodeCache.get(address);
+    if (cached !== undefined && cached.expiresAt > now()) {
+      writeJson(res, 200, { candidates: cached.candidates });
+      return;
+    }
+    const candidates = await map.geocode(address);
+    if (geocodeCacheTtlMs > 0) {
+      geocodeCache.set(address, {
+        expiresAt: now() + geocodeCacheTtlMs,
+        candidates,
+      });
+    }
+    writeJson(res, 200, { candidates });
+  }
+
   return {
     server,
     start(): Promise<void> {
@@ -243,6 +285,7 @@ export function createApp(deps: AppDeps) {
     replaceMapServices(next: ReplaceMapServicesInput): void {
       if (next.mapProvider !== undefined) {
         mapProvider = next.mapProvider;
+        geocodeCache.clear();
       }
       if (next.mapUi !== undefined) {
         mapUi = next.mapUi;
@@ -324,28 +367,26 @@ async function handleSearch(
   res.end(JSON.stringify(result));
 }
 
-async function handleGeocode(
-  req: IncomingMessage,
-  res: ServerResponse,
-  map: MapProvider,
-): Promise<void> {
-  const body = await readJsonBody(req);
-  const address = parseGeocodeAddress(body);
-  const candidates = await map.geocode(address);
-  res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
-  res.end(JSON.stringify({ candidates }));
-}
-
 async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
+  let total = 0;
   for await (const chunk of req) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    total += buf.length;
+    if (total > MAX_REQUEST_BODY_BYTES) {
+      throw new HttpError(413, "Request body too large");
+    }
+    chunks.push(buf);
   }
   const raw = Buffer.concat(chunks).toString("utf8");
   if (!raw.trim()) {
     throw new HttpError(400, "Request body is required");
   }
-  return JSON.parse(raw) as unknown;
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    throw new HttpError(400, "Request body is not valid JSON");
+  }
 }
 
 function parseGeocodeAddress(body: unknown): string {

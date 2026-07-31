@@ -124,6 +124,19 @@ describe("AmapMapProvider", () => {
     });
   });
 
+  it("geocode treats ENGINE_RESPONSE_DATA_ERROR as no candidates", async () => {
+    const fetchMock = vi.fn<FetchFn>(async () =>
+      jsonResponse({
+        status: "0",
+        info: "ENGINE_RESPONSE_DATA_ERROR",
+        infocode: "30001",
+      }),
+    );
+    const map = new AmapMapProvider({ apiKey: "test-key", fetch: fetchMock });
+
+    await expect(map.geocode("@@@###")).resolves.toEqual([]);
+  });
+
   it("throws MapProviderError on HTTP failure", async () => {
     const fetchMock = vi.fn<FetchFn>(
       async () => new Response("gateway timeout", { status: 504 }),

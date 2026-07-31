@@ -823,7 +823,6 @@
         <aside class="side">
           <section>
             <h2 class="section-title" data-i18n="addSection"></h2>
-            <p class="hint" data-i18n="demoHint"></p>
             <label class="field">
               <span data-i18n="label"></span>
               <input id="composer-label" name="label" data-i18n-placeholder="labelPlaceholder" />
@@ -857,7 +856,7 @@
               <h2 class="section-title" data-i18n="prefsSection"></h2>
               <label class="field">
                 <span data-i18n="brand"></span>
-                <input name="brand" value="滨寿司" required />
+                <input name="brand" value="" required data-i18n-placeholder="brandPlaceholder" />
               </label>
               <label class="field">
                 <span data-i18n="objective"></span>
@@ -916,7 +915,6 @@
         en: {
           productTitle: "MeetingSearch",
           tagline: "Find a brand branch that fits everyone.",
-          demoHint: "Demo: look up 海淀区中关村, 望京, or 朝阳区三里屯, then pick a match.",
           addSection: "Add participants",
           listSection: "Participants",
           prefsSection: "Preferences",
@@ -943,6 +941,7 @@
             "Saved. Refresh the page to load the updated JS map credentials.",
           settingsSaveFailed: "Could not save service settings.",
           brand: "Brand",
+          brandPlaceholder: "e.g. 滨寿司",
           objective: "Proximity objective",
           objectiveTotal: "Total distance",
           objectiveMinimax: "Minimax",
@@ -978,6 +977,12 @@
           chooseMatch: "Choose one match below.",
           searching: "Searching…",
           noGeocode: (addr) => `No geocode match for “${addr}”. Try a different address.`,
+          mapProviderGeneric:
+            "Map service could not complete the request. Try again, or check Service settings.",
+          mapProviderBadKey:
+            "高德 API key is invalid. Open Service settings and update AMAP_KEY.",
+          mapProviderQps:
+            "高德 rate limit exceeded. Wait a moment, or lower AMAP_QPS in Service settings.",
           candidateLead: (addr) => `Matches for “${addr}”:`,
           emptyHint:
             "Increase the radius or change the Brand above, then search again to recover from an Empty candidate set.",
@@ -989,7 +994,6 @@
         zh: {
           productTitle: "约了吗",
           tagline: "为大家找到合适的品牌分店。",
-          demoHint: "演示：查找「海淀区中关村」「望京」或「朝阳区三里屯」，再从列表中选一项。",
           addSection: "添加参与者",
           listSection: "参与者列表",
           prefsSection: "偏好设置",
@@ -1015,6 +1019,7 @@
           settingsSavedReload: "已保存。请刷新页面以加载新的 JS 地图凭证。",
           settingsSaveFailed: "保存服务设置失败。",
           brand: "品牌",
+          brandPlaceholder: "例如：滨寿司",
           objective: "就近目标",
           objectiveTotal: "总距离最小",
           objectiveMinimax: "最远人最小",
@@ -1050,6 +1055,11 @@
           chooseMatch: "请在下方选择一个匹配地址。",
           searching: "正在搜索…",
           noGeocode: (addr) => `找不到「${addr}」的匹配结果，请换一个地址。`,
+          mapProviderGeneric:
+            "地图服务暂时无法完成请求，请稍后重试，或检查服务设置。",
+          mapProviderBadKey: "高德密钥无效，请打开服务设置检查 AMAP_KEY。",
+          mapProviderQps:
+            "高德调用过于频繁。请稍后再试，或在服务设置中调低 AMAP_QPS。",
           candidateLead: (addr) => `「${addr}」的匹配结果：`,
           emptyHint: "加大搜索半径或更换品牌，然后再次搜索。",
           objectiveTotalShort: "总距离（求和）",
@@ -1682,8 +1692,18 @@
       }
 
       function apiFailureMessage(data, fallback) {
-        if (data && data.kind === "map_provider_error" && data.message) {
-          return data.message;
+        if (data && data.kind === "map_provider_error") {
+          const raw = typeof data.message === "string" ? data.message : "";
+          if (/INVALID_USER_KEY|USERKEY_PLAT_NOMATCH|INVALID_USER_SCODE/i.test(raw)) {
+            return t("mapProviderBadKey");
+          }
+          if (/CUQPS_HAS_EXCEEDED|QPS/i.test(raw)) {
+            return t("mapProviderQps");
+          }
+          if (/ENGINE_RESPONSE_DATA_ERROR/i.test(raw)) {
+            return t("mapProviderGeneric");
+          }
+          if (raw) return t("mapProviderGeneric");
         }
         if (data && typeof data.message === "string" && data.message) {
           return data.message;

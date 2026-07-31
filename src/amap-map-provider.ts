@@ -2,6 +2,7 @@ import { createQpsGate } from "./concurrency.js";
 import {
   DEFAULT_AMAP_QPS,
   MapProviderError,
+  isMapProviderError,
   type Branch,
   type Coordinates,
   type GeocodeCandidate,
@@ -56,7 +57,20 @@ export class AmapMapProvider implements MapProvider {
     url.searchParams.set("address", address);
     url.searchParams.set("key", this.apiKey);
 
-    const data = await this.getJson(url);
+    let data: Record<string, unknown>;
+    try {
+      data = await this.getJson(url);
+    } catch (err) {
+      // Nonsense / unparseable addresses often come back as ENGINE_RESPONSE_DATA_ERROR
+      // rather than an empty geocodes list — treat as no Geocode candidates.
+      if (
+        isMapProviderError(err) &&
+        /ENGINE_RESPONSE_DATA_ERROR/.test(err.message)
+      ) {
+        return [];
+      }
+      throw err;
+    }
     const geocodes = Array.isArray(data.geocodes) ? data.geocodes : [];
     const candidates: GeocodeCandidate[] = [];
     for (const row of geocodes) {

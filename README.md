@@ -62,6 +62,10 @@ Repeated lookups for the same address are served from an in-memory cache (5-minu
 - **404** `{ "kind": "empty_candidate_set", "message": "..." }` — no Branches in radius
 - **502** `{ "kind": "map_provider_error", "message": "..." }` — key/HTTP/高德 API failure (not an empty Candidate set)
 
+## Contribute
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md).
+
 ## Test
 
 ```bash

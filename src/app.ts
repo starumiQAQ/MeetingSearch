@@ -11,7 +11,12 @@ import {
   type MapUiConfig,
 } from "./map-services.js";
 import type { MapProvider, MeetingSearchInput, ProximityObjective } from "./types.js";
-import { isEmptyCandidateSet, isMapProviderError } from "./types.js";
+import {
+  DEFAULT_AMAP_QPS,
+  isEmptyCandidateSet,
+  isMapProviderError,
+} from "./types.js";
+import type { ServiceEnvKey } from "./env-file.js";
 
 export type { MapUiConfig } from "./map-services.js";
 
@@ -101,15 +106,70 @@ export function createApp(deps: AppDeps) {
     return { configured: Boolean(value?.trim()) };
   }
 
-  function readServiceSettings(): { amapKey: SecretFieldStatus } {
+  function effectiveAmapQps(): number {
+    const raw = serviceEnv.AMAP_QPS ?? serviceEnv.AMAP_CONCURRENCY;
+    if (raw === undefined || String(raw).trim() === "") return DEFAULT_AMAP_QPS;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n <= 0) return DEFAULT_AMAP_QPS;
+    return n;
+  }
+
+  function readServiceSettings(): {
+    amapKey: SecretFieldStatus;
+    amapJsKey: SecretFieldStatus;
+    amapSecurityJsCode: SecretFieldStatus;
+    amapQps: number;
+  } {
     return {
       amapKey: secretStatus(serviceEnv.AMAP_KEY),
+      amapJsKey: secretStatus(serviceEnv.AMAP_JS_KEY),
+      amapSecurityJsCode: secretStatus(serviceEnv.AMAP_SECURITY_JS_CODE),
+      amapQps: effectiveAmapQps(),
     };
   }
 
   function applyBuiltServices(built: MapServicesFromEnv): void {
     mapProvider = built.mapProvider;
     mapUi = built.mapUi;
+  }
+
+  function jsCredentialsFingerprint(env: MapServicesEnv): string {
+    return `${env.AMAP_JS_KEY?.trim() ?? ""}\0${env.AMAP_SECURITY_JS_CODE?.trim() ?? ""}`;
+  }
+
+  function applySecretPatch(
+    o: Record<string, unknown>,
+    opts: {
+      valueKey: string;
+      clearKey: string;
+      envKey: ServiceEnvKey;
+      diskUpdates: Partial<Record<ServiceEnvKey, string>>;
+    },
+  ): void {
+    const clear = o[opts.clearKey] === true;
+    const raw = o[opts.valueKey];
+    if (raw !== undefined && raw !== null && typeof raw !== "string") {
+      throw new HttpError(400, `${opts.valueKey} must be a string`);
+    }
+    if (clear) {
+      serviceEnv[opts.envKey] = "";
+      opts.diskUpdates[opts.envKey] = "";
+    } else if (typeof raw === "string" && raw.trim() !== "") {
+      const trimmed = raw.trim();
+      serviceEnv[opts.envKey] = trimmed;
+      opts.diskUpdates[opts.envKey] = trimmed;
+    }
+    // Empty / omitted without clear → keep current value.
+  }
+
+  function parseAmapQpsInput(raw: unknown): string | undefined {
+    if (raw === undefined || raw === null) return undefined;
+    if (typeof raw === "string" && raw.trim() === "") return undefined;
+    const n = typeof raw === "number" ? raw : Number(raw);
+    if (!Number.isFinite(n) || n <= 0) {
+      throw new HttpError(400, "amapQps must be a positive number");
+    }
+    return String(n);
   }
 
   async function handlePutServiceSettings(
@@ -122,33 +182,46 @@ export function createApp(deps: AppDeps) {
     }
     const o = body as Record<string, unknown>;
 
-    const clearAmapKey = o.clearAmapKey === true;
-    const amapKeyRaw = o.amapKey;
-    if (
-      amapKeyRaw !== undefined &&
-      amapKeyRaw !== null &&
-      typeof amapKeyRaw !== "string"
-    ) {
-      throw new HttpError(400, "amapKey must be a string");
-    }
+    // Validate QPS before mutating memory or disk.
+    const qpsUpdate = parseAmapQpsInput(o.amapQps);
 
-    const diskUpdates: { AMAP_KEY?: string } = {};
+    const jsBefore = jsCredentialsFingerprint(serviceEnv);
 
-    if (clearAmapKey) {
-      serviceEnv.AMAP_KEY = "";
-      diskUpdates.AMAP_KEY = "";
-    } else if (typeof amapKeyRaw === "string" && amapKeyRaw.trim() !== "") {
-      serviceEnv.AMAP_KEY = amapKeyRaw.trim();
-      diskUpdates.AMAP_KEY = amapKeyRaw.trim();
+    const diskUpdates: Partial<Record<ServiceEnvKey, string>> = {};
+
+    applySecretPatch(o, {
+      valueKey: "amapKey",
+      clearKey: "clearAmapKey",
+      envKey: "AMAP_KEY",
+      diskUpdates,
+    });
+    applySecretPatch(o, {
+      valueKey: "amapJsKey",
+      clearKey: "clearAmapJsKey",
+      envKey: "AMAP_JS_KEY",
+      diskUpdates,
+    });
+    applySecretPatch(o, {
+      valueKey: "amapSecurityJsCode",
+      clearKey: "clearAmapSecurityJsCode",
+      envKey: "AMAP_SECURITY_JS_CODE",
+      diskUpdates,
+    });
+
+    if (qpsUpdate !== undefined) {
+      serviceEnv.AMAP_QPS = qpsUpdate;
+      diskUpdates.AMAP_QPS = qpsUpdate;
     }
-    // Empty / omitted amapKey without clear → keep current value (no disk write for key).
 
     if (Object.keys(diskUpdates).length > 0) {
       upsertEnvKeys(envFilePath, diskUpdates);
     }
 
-    applyBuiltServices(buildMapServices(serviceEnv));
-    writeJson(res, 200, readServiceSettings());
+    const built = buildMapServices(serviceEnv);
+    applyBuiltServices(built);
+    const reloadRequired =
+      jsCredentialsFingerprint(serviceEnv) !== jsBefore;
+    writeJson(res, 200, { ...readServiceSettings(), reloadRequired });
   }
 
   return {

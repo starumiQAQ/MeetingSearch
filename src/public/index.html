@@ -141,12 +141,14 @@
       }
 
       .modal {
-        width: min(420px, 100%);
+        width: min(460px, 100%);
         background: var(--panel);
         border-radius: var(--radius);
         border: 1px solid var(--line);
         box-shadow: 0 20px 50px rgba(15, 23, 42, 0.18);
         padding: 1.15rem 1.2rem 1.25rem;
+        max-height: min(90vh, 720px);
+        overflow: auto;
       }
 
       .modal-header {
@@ -743,7 +745,7 @@
                 type="password"
                 autocomplete="off"
                 spellcheck="false"
-                data-i18n-placeholder="amapKeyPlaceholder"
+                data-i18n-placeholder="secretKeepPlaceholder"
               />
             </label>
             <div class="secret-meta">
@@ -752,6 +754,62 @@
                 <button type="button" class="ghost" id="clear-amap-key" data-i18n="clearSecret"></button>
               </div>
             </div>
+          </div>
+          <div class="secret-row">
+            <label class="field" for="settings-amap-js-key">
+              <span data-i18n="amapJsKeyLabel"></span>
+              <input
+                id="settings-amap-js-key"
+                type="password"
+                autocomplete="off"
+                spellcheck="false"
+                data-i18n-placeholder="secretKeepPlaceholder"
+              />
+            </label>
+            <div class="secret-meta">
+              <span id="settings-amap-js-key-status"></span>
+              <div class="secret-actions">
+                <button type="button" class="ghost" id="clear-amap-js-key" data-i18n="clearSecret"></button>
+              </div>
+            </div>
+          </div>
+          <div class="secret-row">
+            <label class="field" for="settings-amap-security-js-code">
+              <span data-i18n="amapSecurityJsCodeLabel"></span>
+              <input
+                id="settings-amap-security-js-code"
+                type="password"
+                autocomplete="off"
+                spellcheck="false"
+                data-i18n-placeholder="secretKeepPlaceholder"
+              />
+            </label>
+            <div class="secret-meta">
+              <span id="settings-amap-security-js-code-status"></span>
+              <div class="secret-actions">
+                <button
+                  type="button"
+                  class="ghost"
+                  id="clear-amap-security-js-code"
+                  data-i18n="clearSecret"
+                ></button>
+              </div>
+            </div>
+          </div>
+          <div class="secret-row">
+            <label class="field" for="settings-amap-qps">
+              <span data-i18n="amapQpsLabel"></span>
+              <input
+                id="settings-amap-qps"
+                type="number"
+                min="1"
+                step="1"
+                inputmode="numeric"
+                autocomplete="off"
+                data-i18n-placeholder="amapQpsPlaceholder"
+              />
+            </label>
+            <p class="hint" data-i18n="amapQpsHint" style="margin: 0"></p>
           </div>
           <p class="settings-status" id="settings-status" aria-live="polite"></p>
           <div class="modal-footer">
@@ -864,14 +922,25 @@
           prefsSection: "Preferences",
           serviceSettings: "Service settings",
           serviceSettingsHint:
-            "Deployer knobs for 高德 Web 服务. Separate from search preferences (Brand / Proximity / radius).",
+            "Deployer knobs for 高德 Web 服务 / JS map / QPS. Separate from search preferences (Brand / Proximity / radius).",
           amapKeyLabel: "AMAP_KEY (Web 服务)",
-          amapKeyPlaceholder: "Leave empty to keep current value",
+          amapJsKeyLabel: "AMAP_JS_KEY (JS API)",
+          amapSecurityJsCodeLabel: "AMAP_SECURITY_JS_CODE",
+          amapQpsLabel: "AMAP_QPS (requests/sec)",
+          amapQpsPlaceholder: "e.g. 3",
+          amapQpsHint: "Positive number. Leave empty to keep the current limit.",
+          secretKeepPlaceholder: "Leave empty to keep current value",
           amapKeyConfigured: "Configured (masked)",
           amapKeyMissing: "Not configured — using demo MapProvider",
+          amapJsKeyConfigured: "Configured (masked)",
+          amapJsKeyMissing: "Not set — map falls back to AMAP_KEY",
+          amapSecurityConfigured: "Configured (masked)",
+          amapSecurityMissing: "Not set",
           clearSecret: "Clear",
           saveSettings: "Save",
           settingsSaved: "Saved. New searches use the updated MapProvider.",
+          settingsSavedReload:
+            "Saved. Refresh the page to load the updated JS map credentials.",
           settingsSaveFailed: "Could not save service settings.",
           brand: "Brand",
           objective: "Proximity objective",
@@ -926,14 +995,24 @@
           prefsSection: "偏好设置",
           serviceSettings: "服务设置",
           serviceSettingsHint:
-            "部署用的高德 Web 服务配置，与搜索偏好（品牌 / 就近目标 / 半径）分开。",
+            "部署用的高德 Web 服务 / JS 地图 / QPS 配置，与搜索偏好（品牌 / 就近目标 / 半径）分开。",
           amapKeyLabel: "AMAP_KEY（Web 服务）",
-          amapKeyPlaceholder: "留空表示保持当前值",
+          amapJsKeyLabel: "AMAP_JS_KEY（JS API）",
+          amapSecurityJsCodeLabel: "AMAP_SECURITY_JS_CODE",
+          amapQpsLabel: "AMAP_QPS（次/秒）",
+          amapQpsPlaceholder: "例如 3",
+          amapQpsHint: "正数。留空表示保持当前限速。",
+          secretKeepPlaceholder: "留空表示保持当前值",
           amapKeyConfigured: "已配置（已脱敏）",
           amapKeyMissing: "未配置 — 使用演示 MapProvider",
+          amapJsKeyConfigured: "已配置（已脱敏）",
+          amapJsKeyMissing: "未设置 — 地图回退使用 AMAP_KEY",
+          amapSecurityConfigured: "已配置（已脱敏）",
+          amapSecurityMissing: "未设置",
           clearSecret: "清除",
           saveSettings: "保存",
           settingsSaved: "已保存。后续搜索会使用更新后的 MapProvider。",
+          settingsSavedReload: "已保存。请刷新页面以加载新的 JS 地图凭证。",
           settingsSaveFailed: "保存服务设置失败。",
           brand: "品牌",
           objective: "就近目标",
@@ -1001,8 +1080,19 @@
       const cancelServiceSettingsBtn = document.getElementById("cancel-service-settings");
       const saveServiceSettingsBtn = document.getElementById("save-service-settings");
       const clearAmapKeyBtn = document.getElementById("clear-amap-key");
+      const clearAmapJsKeyBtn = document.getElementById("clear-amap-js-key");
+      const clearAmapSecurityJsCodeBtn = document.getElementById("clear-amap-security-js-code");
       const settingsAmapKeyInput = document.getElementById("settings-amap-key");
+      const settingsAmapJsKeyInput = document.getElementById("settings-amap-js-key");
+      const settingsAmapSecurityJsCodeInput = document.getElementById(
+        "settings-amap-security-js-code",
+      );
+      const settingsAmapQpsInput = document.getElementById("settings-amap-qps");
       const settingsAmapKeyStatus = document.getElementById("settings-amap-key-status");
+      const settingsAmapJsKeyStatus = document.getElementById("settings-amap-js-key-status");
+      const settingsAmapSecurityJsCodeStatus = document.getElementById(
+        "settings-amap-security-js-code-status",
+      );
       const settingsStatusEl = document.getElementById("settings-status");
       const apiPill = document.getElementById("api-pill");
       const apiPillText = document.getElementById("api-pill-text");
@@ -1081,10 +1171,7 @@
           );
         }
         if (!serviceSettingsModal.hidden) {
-          const wasConfigured =
-            settingsAmapKeyStatus.textContent.includes("Configured") ||
-            settingsAmapKeyStatus.textContent.includes("已配置");
-          updateAmapKeyStatus(wasConfigured);
+          refreshSecretStatusesFromLabels();
         }
       }
 
@@ -1105,6 +1192,14 @@
       });
 
       let clearAmapKeyRequested = false;
+      let clearAmapJsKeyRequested = false;
+      let clearAmapSecurityJsCodeRequested = false;
+      /** @type {{ amapKey: boolean, amapJsKey: boolean, amapSecurityJsCode: boolean }} */
+      let secretConfigured = {
+        amapKey: false,
+        amapJsKey: false,
+        amapSecurityJsCode: false,
+      };
 
       function setSettingsStatus(message, kind) {
         settingsStatusEl.textContent = message || "";
@@ -1113,21 +1208,56 @@
       }
 
       function updateAmapKeyStatus(configured) {
+        secretConfigured.amapKey = configured;
         settingsAmapKeyStatus.textContent = configured
           ? t("amapKeyConfigured")
           : t("amapKeyMissing");
       }
 
+      function updateAmapJsKeyStatus(configured) {
+        secretConfigured.amapJsKey = configured;
+        settingsAmapJsKeyStatus.textContent = configured
+          ? t("amapJsKeyConfigured")
+          : t("amapJsKeyMissing");
+      }
+
+      function updateAmapSecurityStatus(configured) {
+        secretConfigured.amapSecurityJsCode = configured;
+        settingsAmapSecurityJsCodeStatus.textContent = configured
+          ? t("amapSecurityConfigured")
+          : t("amapSecurityMissing");
+      }
+
+      function refreshSecretStatusesFromLabels() {
+        updateAmapKeyStatus(secretConfigured.amapKey);
+        updateAmapJsKeyStatus(secretConfigured.amapJsKey);
+        updateAmapSecurityStatus(secretConfigured.amapSecurityJsCode);
+      }
+
+      function applySettingsResponse(body) {
+        updateAmapKeyStatus(Boolean(body?.amapKey?.configured));
+        updateAmapJsKeyStatus(Boolean(body?.amapJsKey?.configured));
+        updateAmapSecurityStatus(Boolean(body?.amapSecurityJsCode?.configured));
+        if (typeof body?.amapQps === "number" && Number.isFinite(body.amapQps)) {
+          settingsAmapQpsInput.value = String(body.amapQps);
+        }
+      }
+
       function openServiceSettings() {
         clearAmapKeyRequested = false;
+        clearAmapJsKeyRequested = false;
+        clearAmapSecurityJsCodeRequested = false;
         settingsAmapKeyInput.value = "";
+        settingsAmapJsKeyInput.value = "";
+        settingsAmapSecurityJsCodeInput.value = "";
+        settingsAmapQpsInput.value = "";
         setSettingsStatus("", null);
         serviceSettingsModal.hidden = false;
         serviceSettingsModal.classList.add("open");
         fetch("/api/service-settings")
           .then((res) => res.json())
           .then((body) => {
-            updateAmapKeyStatus(Boolean(body?.amapKey?.configured));
+            applySettingsResponse(body);
           })
           .catch(() => {
             setSettingsStatus(t("settingsSaveFailed"), "err");
@@ -1152,20 +1282,42 @@
         updateAmapKeyStatus(false);
         setSettingsStatus("", null);
       });
+      clearAmapJsKeyBtn.addEventListener("click", () => {
+        clearAmapJsKeyRequested = true;
+        settingsAmapJsKeyInput.value = "";
+        updateAmapJsKeyStatus(false);
+        setSettingsStatus("", null);
+      });
+      clearAmapSecurityJsCodeBtn.addEventListener("click", () => {
+        clearAmapSecurityJsCodeRequested = true;
+        settingsAmapSecurityJsCodeInput.value = "";
+        updateAmapSecurityStatus(false);
+        setSettingsStatus("", null);
+      });
 
       settingsAmapKeyInput.addEventListener("input", () => {
-        if (settingsAmapKeyInput.value.trim()) {
-          clearAmapKeyRequested = false;
+        if (settingsAmapKeyInput.value.trim()) clearAmapKeyRequested = false;
+      });
+      settingsAmapJsKeyInput.addEventListener("input", () => {
+        if (settingsAmapJsKeyInput.value.trim()) clearAmapJsKeyRequested = false;
+      });
+      settingsAmapSecurityJsCodeInput.addEventListener("input", () => {
+        if (settingsAmapSecurityJsCodeInput.value.trim()) {
+          clearAmapSecurityJsCodeRequested = false;
         }
       });
 
       saveServiceSettingsBtn.addEventListener("click", async () => {
         const payload = {};
-        if (clearAmapKeyRequested) {
-          payload.clearAmapKey = true;
-        } else {
-          payload.amapKey = settingsAmapKeyInput.value;
-        }
+        if (clearAmapKeyRequested) payload.clearAmapKey = true;
+        else payload.amapKey = settingsAmapKeyInput.value;
+        if (clearAmapJsKeyRequested) payload.clearAmapJsKey = true;
+        else payload.amapJsKey = settingsAmapJsKeyInput.value;
+        if (clearAmapSecurityJsCodeRequested) payload.clearAmapSecurityJsCode = true;
+        else payload.amapSecurityJsCode = settingsAmapSecurityJsCodeInput.value;
+        const qpsRaw = settingsAmapQpsInput.value.trim();
+        if (qpsRaw !== "") payload.amapQps = qpsRaw;
+
         setSettingsStatus("", null);
         try {
           const res = await fetch("/api/service-settings", {
@@ -1179,9 +1331,16 @@
             return;
           }
           clearAmapKeyRequested = false;
+          clearAmapJsKeyRequested = false;
+          clearAmapSecurityJsCodeRequested = false;
           settingsAmapKeyInput.value = "";
-          updateAmapKeyStatus(Boolean(body?.amapKey?.configured));
-          setSettingsStatus(t("settingsSaved"), "ok");
+          settingsAmapJsKeyInput.value = "";
+          settingsAmapSecurityJsCodeInput.value = "";
+          applySettingsResponse(body);
+          setSettingsStatus(
+            body.reloadRequired ? t("settingsSavedReload") : t("settingsSaved"),
+            "ok",
+          );
         } catch {
           setSettingsStatus(t("settingsSaveFailed"), "err");
         }

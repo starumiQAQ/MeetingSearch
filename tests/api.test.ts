@@ -625,7 +625,7 @@ describe("buildMapServicesFromEnv via createApp", () => {
   });
 });
 
-describe("Service settings HTTP (AMAP_KEY)", () => {
+describe("Service settings HTTP", () => {
   async function withSettingsApp(
     opts: {
       envContents?: string;
@@ -830,6 +830,192 @@ describe("Service settings HTTP (AMAP_KEY)", () => {
         expect((await after.json()).candidates[0].formattedAddress).toBe(
           "keyed-provider-望京",
         );
+      },
+    );
+  });
+
+  it("GET returns JS credentials as configured flags without plaintext", async () => {
+    await withSettingsApp(
+      {
+        serviceEnv: {
+          AMAP_KEY: "web-key",
+          AMAP_JS_KEY: "js-secret-key-xyz",
+          AMAP_SECURITY_JS_CODE: "sec-code-abc",
+        },
+        envContents:
+          "AMAP_KEY=web-key\nAMAP_JS_KEY=js-secret-key-xyz\nAMAP_SECURITY_JS_CODE=sec-code-abc\n",
+      },
+      async ({ baseUrl }) => {
+        const res = await fetch(`${baseUrl}/api/service-settings`);
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.amapJsKey.configured).toBe(true);
+        expect(body.amapSecurityJsCode.configured).toBe(true);
+        const dumped = JSON.stringify(body);
+        expect(dumped).not.toContain("js-secret-key-xyz");
+        expect(dumped).not.toContain("sec-code-abc");
+      },
+    );
+  });
+
+  it("PUT saves JS keys; empty keeps; clear wipes and falls back MapUi to AMAP_KEY", async () => {
+    await withSettingsApp(
+      {
+        serviceEnv: {
+          AMAP_KEY: "web-fallback-key",
+          AMAP_JS_KEY: "old-js-key",
+          AMAP_SECURITY_JS_CODE: "old-sec",
+        },
+        envContents:
+          "AMAP_KEY=web-fallback-key\nAMAP_JS_KEY=old-js-key\nAMAP_SECURITY_JS_CODE=old-sec\n",
+      },
+      async ({ baseUrl, envFilePath }) => {
+        const keep = await fetch(`${baseUrl}/api/service-settings`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amapJsKey: "", amapSecurityJsCode: "" }),
+        });
+        expect(keep.status).toBe(200);
+        const keepBody = await keep.json();
+        expect(keepBody.amapJsKey.configured).toBe(true);
+        expect(keepBody.amapSecurityJsCode.configured).toBe(true);
+        expect(keepBody.reloadRequired).toBe(false);
+
+        const { readFile } = await import("node:fs/promises");
+        expect(await readFile(envFilePath, "utf8")).toMatch(
+          /AMAP_JS_KEY=old-js-key/,
+        );
+
+        const save = await fetch(`${baseUrl}/api/service-settings`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amapJsKey: "new-js-key",
+            amapSecurityJsCode: "new-sec",
+          }),
+        });
+        expect(save.status).toBe(200);
+        const saveBody = await save.json();
+        expect(saveBody.amapJsKey.configured).toBe(true);
+        expect(saveBody.amapSecurityJsCode.configured).toBe(true);
+        expect(saveBody.reloadRequired).toBe(true);
+
+        const disk = await readFile(envFilePath, "utf8");
+        expect(disk).toMatch(/AMAP_JS_KEY=new-js-key/);
+        expect(disk).toMatch(/AMAP_SECURITY_JS_CODE=new-sec/);
+
+        const page = await fetch(`${baseUrl}/`);
+        const html = await page.text();
+        expect(html).toContain('"jsKey":"new-js-key"');
+        expect(html).toContain('"securityJsCode":"new-sec"');
+
+        const cleared = await fetch(`${baseUrl}/api/service-settings`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            clearAmapJsKey: true,
+            clearAmapSecurityJsCode: true,
+          }),
+        });
+        expect(cleared.status).toBe(200);
+        const clearedBody = await cleared.json();
+        expect(clearedBody.amapJsKey.configured).toBe(false);
+        expect(clearedBody.amapSecurityJsCode.configured).toBe(false);
+        expect(clearedBody.reloadRequired).toBe(true);
+
+        expect(await readFile(envFilePath, "utf8")).toMatch(/AMAP_JS_KEY=\s*$/m);
+        expect(await readFile(envFilePath, "utf8")).toMatch(
+          /AMAP_SECURITY_JS_CODE=\s*$/m,
+        );
+
+        const pageAfter = await fetch(`${baseUrl}/`);
+        const htmlAfter = await pageAfter.text();
+        // Empty AMAP_JS_KEY → fall back to AMAP_KEY for MapUi jsKey
+        expect(htmlAfter).toContain('"jsKey":"web-fallback-key"');
+        expect(htmlAfter).toContain('"securityJsCode":""');
+      },
+    );
+  });
+
+  it("GET returns plaintext amapQps; PUT validates and hot-swaps QPS without forcing reload", async () => {
+    let lastBuiltQps: string | undefined;
+    await withSettingsApp(
+      {
+        serviceEnv: {
+          AMAP_KEY: "web-key",
+          AMAP_QPS: "3",
+        },
+        envContents: "AMAP_KEY=web-key\nAMAP_QPS=3\n",
+        buildMapServices: (env) => {
+          lastBuiltQps = env.AMAP_QPS;
+          const built = buildMapServicesFromEnv(env);
+          if (!env.AMAP_KEY?.trim()) return built;
+          const keyed = new FakeMapProvider({
+            branchesByBrand: { 滨寿司: [branch] },
+            geocodeResults: {
+              望京: [
+                {
+                  formattedAddress: "keyed-provider-望京",
+                  coordinates: { lat: 39.99, lng: 116.47 },
+                },
+              ],
+            },
+          });
+          return { ...built, mapProvider: keyed };
+        },
+      },
+      async ({ baseUrl, envFilePath }) => {
+        const get = await fetch(`${baseUrl}/api/service-settings`);
+        expect(get.status).toBe(200);
+        expect((await get.json()).amapQps).toBe(3);
+
+        const { readFile } = await import("node:fs/promises");
+        const beforeDisk = await readFile(envFilePath, "utf8");
+
+        const bad = await fetch(`${baseUrl}/api/service-settings`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amapQps: 0 }),
+        });
+        expect(bad.status).toBe(400);
+        const badBody = await bad.json();
+        expect(badBody.error).toMatch(/qps/i);
+        expect(await readFile(envFilePath, "utf8")).toBe(beforeDisk);
+
+        const save = await fetch(`${baseUrl}/api/service-settings`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amapQps: 7 }),
+        });
+        expect(save.status).toBe(200);
+        const saveBody = await save.json();
+        expect(saveBody.amapQps).toBe(7);
+        expect(saveBody.reloadRequired).toBe(false);
+        expect(lastBuiltQps).toBe("7");
+        expect(await readFile(envFilePath, "utf8")).toMatch(/AMAP_QPS=7/);
+      },
+    );
+  });
+
+  it("AMAP_KEY-only save does not set reloadRequired when JS key is dedicated", async () => {
+    await withSettingsApp(
+      {
+        serviceEnv: {
+          AMAP_KEY: "web-key",
+          AMAP_JS_KEY: "dedicated-js",
+          AMAP_SECURITY_JS_CODE: "sec",
+        },
+        envContents:
+          "AMAP_KEY=web-key\nAMAP_JS_KEY=dedicated-js\nAMAP_SECURITY_JS_CODE=sec\n",
+      },
+      async ({ baseUrl }) => {
+        const res = await fetch(`${baseUrl}/api/service-settings`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amapKey: "other-web-key" }),
+        });
+        expect(res.status).toBe(200);
+        expect((await res.json()).reloadRequired).toBe(false);
       },
     );
   });

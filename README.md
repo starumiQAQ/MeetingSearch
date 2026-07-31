@@ -6,17 +6,18 @@ Local web app that ranks Brand Branches for a group of Participants under a chos
 
 ```bash
 npm install
-cp .env.example .env   # then set AMAP_KEY
 npm start
 ```
 
-Open http://localhost:3000 — enter free-text Participant addresses. The page geocodes via `POST /api/geocode` (unique hits apply automatically; ambiguous matches need a choice) and then posts resolved coordinates to `POST /api/search`. Ranking, Distances, and Candidate set still run **server-side**. The browser embeds a 高德 JS map for display (Participants / top Branches / disambiguation picks) when a JS key is configured (ADR-0003).
+Open http://localhost:3000. Without credentials the app starts on the demo MapProvider. Use the top-bar **Service settings** / 「服务设置」 to set `AMAP_KEY`, `AMAP_JS_KEY`, `AMAP_SECURITY_JS_CODE`, and `AMAP_QPS` — values are written to a local `.env` and hot-swapped (refresh the page after changing JS map credentials). Hand-editing `.env` is optional; `cp .env.example .env` is only useful if you prefer a file on disk before first start.
+
+Enter free-text Participant addresses. The page geocodes via `POST /api/geocode` (unique hits apply automatically; ambiguous matches need a choice) and then posts resolved coordinates to `POST /api/search`. Ranking, Distances, and Candidate set still run **server-side**. The browser embeds a 高德 JS map for display (Participants / top Branches / disambiguation picks) when a JS key is configured (ADR-0003).
 
 ### MapProvider
 
 | Config | Behavior |
 |--------|----------|
-| `AMAP_KEY` set in env or `.env` | Live 高德 `AmapMapProvider` (geocode, Branch POI, driving Distance) |
+| `AMAP_KEY` set (Service settings or `.env`) | Live 高德 `AmapMapProvider` (geocode, Branch POI, driving Distance) |
 | Key missing / empty | Demo fake MapProvider (no network; sample 滨寿司 Branches) |
 | `AMAP_QPS` (optional) | 高德 HTTP **次/秒** 上限；默认 **3**（不是同时在途数） |
 | `AMAP_JS_KEY` (optional) | Web 端 JS API key for the browser map; falls back to `AMAP_KEY` if unset |
@@ -24,7 +25,7 @@ Open http://localhost:3000 — enter free-text Participant addresses. The page g
 
 `.env` is gitignored. Commit only `.env.example` (empty key placeholders). Restrict the JS key with a domain whitelist in the 高德 console — it is injected into the page.
 
-You can also set `AMAP_KEY`, `AMAP_JS_KEY`, `AMAP_SECURITY_JS_CODE`, and `AMAP_QPS` from the in-app **Service settings** / 「服务设置」 control in the top bar. Saves rewrite the local `.env`, hot-swap the server MapProvider / QPS, and update MapUi for subsequent page loads (refresh the browser after changing JS map credentials). **Do not expose this server on a public network** — there is no auth, so anyone who can reach it can rewrite `.env` and credentials (ADR-0004).
+**Do not expose this server on a public network** — Service settings has no auth, so anyone who can reach the process can rewrite `.env` and credentials (ADR-0004).
 
 `POST /api/search` 仍可传 `"concurrency"` 控制 MeetingSearch 侧并行调度；真正打高德的频率由 `AMAP_QPS` 闸住。
 

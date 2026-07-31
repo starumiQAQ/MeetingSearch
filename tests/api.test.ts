@@ -191,6 +191,8 @@ describe("local web API", () => {
     expect(html).toContain("empty_candidate_set");
     expect(html).not.toContain('name="lat"');
     expect(html).not.toContain('name="lng"');
+    expect(html).toContain('id="status" role="status" aria-live="polite"');
+    expect(html).toContain('class="drawer" id="drawer" aria-hidden="true" inert');
   });
 
   it("serves per-participant address lookup, Ranking gate, layout gap, and zh UI copy", async () => {

@@ -877,7 +877,7 @@
             </section>
 
             <button class="primary" type="submit" id="search-button" data-i18n="search"></button>
-            <div id="status"></div>
+            <div id="status" role="status" aria-live="polite"></div>
           </form>
         </aside>
 
@@ -893,7 +893,7 @@
             <h2 data-i18n="mapEmptyTitle"></h2>
             <p data-i18n="mapEmptyBody"></p>
           </div>
-          <div class="drawer" id="drawer" aria-hidden="true">
+          <div class="drawer" id="drawer" aria-hidden="true" inert>
             <div class="drawer-header">
               <h2 id="drawer-title"></h2>
               <button type="button" class="ghost" id="drawer-close" data-i18n="drawerCollapse"></button>
@@ -1124,6 +1124,9 @@
       let lastRanking = null;
       let selectedBranchIndex = 0;
       let searchInFlight = false;
+      let settingsSaveInFlight = false;
+      let geocodeInFlight = false;
+      let geocodeRequestId = 0;
       /** @type {any[]} */
       let pendingCandidates = [];
       let pendingQuery = "";
@@ -1169,6 +1172,8 @@
           const key = el.getAttribute("data-i18n-placeholder");
           if (key && "placeholder" in el) el.placeholder = t(key);
         });
+        // Search button shows progress while a search is running.
+        searchButton.textContent = searchInFlight ? t("searching") : t("search");
 
         renderParticipantList();
         if (geocodePanel && !geocodePanel.hidden && pendingCandidates.length) {
@@ -1264,6 +1269,7 @@
         setSettingsStatus("", null);
         serviceSettingsModal.hidden = false;
         serviceSettingsModal.classList.add("open");
+        settingsAmapKeyInput.focus();
         fetch("/api/service-settings")
           .then((res) => res.json())
           .then((body) => {
@@ -1277,6 +1283,7 @@
       function closeServiceSettings() {
         serviceSettingsModal.classList.remove("open");
         serviceSettingsModal.hidden = true;
+        openServiceSettingsBtn.focus();
       }
 
       openServiceSettingsBtn.addEventListener("click", openServiceSettings);
@@ -1284,6 +1291,21 @@
       cancelServiceSettingsBtn.addEventListener("click", closeServiceSettings);
       serviceSettingsModal.addEventListener("click", (ev) => {
         if (ev.target === serviceSettingsModal) closeServiceSettings();
+      });
+      serviceSettingsModal.addEventListener("keydown", (ev) => {
+        if (ev.key === "Escape") {
+          ev.preventDefault();
+          closeServiceSettings();
+          return;
+        }
+        if (
+          ev.key === "Enter" &&
+          ev.target instanceof HTMLInputElement &&
+          !settingsSaveInFlight
+        ) {
+          ev.preventDefault();
+          saveServiceSettingsBtn.click();
+        }
       });
 
       clearAmapKeyBtn.addEventListener("click", () => {
@@ -1318,6 +1340,9 @@
       });
 
       saveServiceSettingsBtn.addEventListener("click", async () => {
+        if (settingsSaveInFlight) return;
+        settingsSaveInFlight = true;
+        saveServiceSettingsBtn.disabled = true;
         const payload = {};
         if (clearAmapKeyRequested) payload.clearAmapKey = true;
         else payload.amapKey = settingsAmapKeyInput.value;
@@ -1353,6 +1378,9 @@
           );
         } catch {
           setSettingsStatus(t("settingsSaveFailed"), "err");
+        } finally {
+          settingsSaveInFlight = false;
+          saveServiceSettingsBtn.disabled = false;
         }
       });
 
@@ -1417,6 +1445,7 @@
           composerLabel.focus();
           return;
         }
+        statusEl.textContent = "";
         openPickerBtn.hidden = true;
         addressPicker.hidden = false;
         composerAddress.value = "";
@@ -1438,6 +1467,12 @@
       }
 
       openPickerBtn.addEventListener("click", openAddressPicker);
+      composerLabel.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          openAddressPicker();
+        }
+      });
       cancelPickerBtn.addEventListener("click", () => {
         closeAddressPicker();
         statusEl.textContent = "";
@@ -1450,6 +1485,22 @@
         if (event.key === "Enter") {
           event.preventDefault();
           void lookupAddress();
+        } else if (event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+          closeAddressPicker();
+          statusEl.textContent = "";
+          openPickerBtn.focus();
+        }
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape") return;
+        if (!serviceSettingsModal.hidden) return; // modal handles Escape itself
+        if (drawerEl.classList.contains("open")) {
+          event.preventDefault();
+          closeDrawer();
+          searchButton.focus();
         }
       });
 
@@ -1459,6 +1510,9 @@
           composerAddress.focus();
           return;
         }
+        if (geocodeInFlight) return;
+        geocodeInFlight = true;
+        const requestId = ++geocodeRequestId;
         lookupBtn.disabled = true;
         statusEl.textContent = t("lookingUp");
         geocodePanel.hidden = true;
@@ -1473,6 +1527,7 @@
             body: JSON.stringify({ address }),
           });
           const data = await res.json();
+          if (requestId !== geocodeRequestId) return;
           if (!res.ok) {
             throw new Error(apiFailureMessage(data, "Geocode failed"));
           }
@@ -1481,13 +1536,18 @@
             statusEl.textContent = t("noGeocode", address);
             return;
           }
+          if (addressPicker.hidden) return; // picker was closed while looking up
           pendingCandidates = candidates;
           renderCandidates(address, candidates);
           statusEl.textContent = t("chooseMatch");
         } catch (err) {
+          if (requestId !== geocodeRequestId) return;
           statusEl.textContent = err.message ?? String(err);
         } finally {
-          lookupBtn.disabled = false;
+          if (requestId === geocodeRequestId) {
+            geocodeInFlight = false;
+            lookupBtn.disabled = false;
+          }
         }
       }
 
@@ -1537,10 +1597,12 @@
         renderParticipantList();
         syncMapFromParticipants();
         statusEl.textContent = "";
+        composerLabel.focus();
       }
 
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
+        if (searchInFlight) return;
         if (participants.length < 2) {
           statusEl.textContent = t("needAllResolved");
           updateSearchGate();
@@ -1550,11 +1612,15 @@
         await runSearch(participants);
       });
 
-      drawerCloseBtn.addEventListener("click", () => closeDrawer());
+      drawerCloseBtn.addEventListener("click", () => {
+        closeDrawer();
+        searchButton.focus();
+      });
 
       function openDrawer(title, html) {
         drawerTitleEl.textContent = title;
         drawerBodyEl.innerHTML = html;
+        drawerEl.inert = false;
         drawerEl.classList.add("open");
         drawerEl.setAttribute("aria-hidden", "false");
       }
@@ -1562,6 +1628,7 @@
       function closeDrawer() {
         drawerEl.classList.remove("open");
         drawerEl.setAttribute("aria-hidden", "true");
+        drawerEl.inert = true;
       }
 
       drawerBodyEl.addEventListener("click", (event) => {
@@ -1577,6 +1644,7 @@
       async function runSearch(people) {
         statusEl.textContent = t("searching");
         searchInFlight = true;
+        searchButton.textContent = t("searching");
         updateSearchGate();
 
         const fd = new FormData(form);
@@ -1630,6 +1698,7 @@
           statusEl.textContent = err.message ?? String(err);
         } finally {
           searchInFlight = false;
+          searchButton.textContent = t("search");
           updateSearchGate();
         }
       }

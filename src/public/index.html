@@ -125,6 +125,97 @@
         box-shadow: none;
       }
 
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.45);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        z-index: 40;
+      }
+
+      .modal-backdrop.open {
+        display: flex;
+      }
+
+      .modal {
+        width: min(420px, 100%);
+        background: var(--panel);
+        border-radius: var(--radius);
+        border: 1px solid var(--line);
+        box-shadow: 0 20px 50px rgba(15, 23, 42, 0.18);
+        padding: 1.15rem 1.2rem 1.25rem;
+      }
+
+      .modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin-bottom: 0.85rem;
+      }
+
+      .modal-header h2 {
+        margin: 0;
+        font-size: 1.05rem;
+      }
+
+      .modal .hint {
+        margin: 0 0 0.85rem;
+        color: var(--muted);
+        font-size: 0.85rem;
+        line-height: 1.45;
+      }
+
+      .secret-row {
+        display: grid;
+        gap: 0.4rem;
+        margin-bottom: 0.85rem;
+      }
+
+      .secret-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+
+      .secret-actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+
+      .modal-footer {
+        display: flex;
+        gap: 0.5rem;
+        justify-content: flex-end;
+        margin-top: 0.5rem;
+      }
+
+      .modal-footer .primary {
+        width: auto;
+        padding: 0.55rem 1rem;
+      }
+
+      .settings-status {
+        min-height: 1.25rem;
+        font-size: 0.85rem;
+        margin: 0.35rem 0 0.25rem;
+      }
+
+      .settings-status.ok {
+        color: var(--recommend);
+      }
+
+      .settings-status.err {
+        color: var(--danger);
+      }
+
       .layout {
         flex: 1 1 auto;
         display: grid;
@@ -623,11 +714,52 @@
             <span class="dot" aria-hidden="true"></span>
             <span id="api-pill-text"></span>
           </div>
+          <button type="button" class="ghost" id="open-service-settings" data-i18n="serviceSettings">
+            Service settings
+          </button>
           <button type="button" class="ghost" id="lang-toggle" aria-label="Language">
             EN
           </button>
         </div>
       </header>
+
+      <div class="modal-backdrop" id="service-settings-modal" hidden>
+        <div
+          class="modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="service-settings-title"
+        >
+          <div class="modal-header">
+            <h2 id="service-settings-title" data-i18n="serviceSettings"></h2>
+            <button type="button" class="ghost" id="close-service-settings" data-i18n="cancel"></button>
+          </div>
+          <p class="hint" data-i18n="serviceSettingsHint"></p>
+          <div class="secret-row">
+            <label class="field" for="settings-amap-key">
+              <span data-i18n="amapKeyLabel"></span>
+              <input
+                id="settings-amap-key"
+                type="password"
+                autocomplete="off"
+                spellcheck="false"
+                data-i18n-placeholder="amapKeyPlaceholder"
+              />
+            </label>
+            <div class="secret-meta">
+              <span id="settings-amap-key-status"></span>
+              <div class="secret-actions">
+                <button type="button" class="ghost" id="clear-amap-key" data-i18n="clearSecret"></button>
+              </div>
+            </div>
+          </div>
+          <p class="settings-status" id="settings-status" aria-live="polite"></p>
+          <div class="modal-footer">
+            <button type="button" class="ghost" id="cancel-service-settings" data-i18n="cancel"></button>
+            <button type="button" class="primary" id="save-service-settings" data-i18n="saveSettings"></button>
+          </div>
+        </div>
+      </div>
 
       <div class="layout">
         <aside class="side">
@@ -730,6 +862,17 @@
           addSection: "Add participants",
           listSection: "Participants",
           prefsSection: "Preferences",
+          serviceSettings: "Service settings",
+          serviceSettingsHint:
+            "Deployer knobs for 高德 Web 服务. Separate from search preferences (Brand / Proximity / radius).",
+          amapKeyLabel: "AMAP_KEY (Web 服务)",
+          amapKeyPlaceholder: "Leave empty to keep current value",
+          amapKeyConfigured: "Configured (masked)",
+          amapKeyMissing: "Not configured — using demo MapProvider",
+          clearSecret: "Clear",
+          saveSettings: "Save",
+          settingsSaved: "Saved. New searches use the updated MapProvider.",
+          settingsSaveFailed: "Could not save service settings.",
           brand: "Brand",
           objective: "Proximity objective",
           objectiveTotal: "Total distance",
@@ -781,6 +924,17 @@
           addSection: "添加参与者",
           listSection: "参与者列表",
           prefsSection: "偏好设置",
+          serviceSettings: "服务设置",
+          serviceSettingsHint:
+            "部署用的高德 Web 服务配置，与搜索偏好（品牌 / 就近目标 / 半径）分开。",
+          amapKeyLabel: "AMAP_KEY（Web 服务）",
+          amapKeyPlaceholder: "留空表示保持当前值",
+          amapKeyConfigured: "已配置（已脱敏）",
+          amapKeyMissing: "未配置 — 使用演示 MapProvider",
+          clearSecret: "清除",
+          saveSettings: "保存",
+          settingsSaved: "已保存。后续搜索会使用更新后的 MapProvider。",
+          settingsSaveFailed: "保存服务设置失败。",
           brand: "品牌",
           objective: "就近目标",
           objectiveTotal: "总距离最小",
@@ -841,6 +995,15 @@
       const mapEmptyEl = document.getElementById("map-empty");
       const productTitleEl = document.getElementById("product-title");
       const langToggleBtn = document.getElementById("lang-toggle");
+      const openServiceSettingsBtn = document.getElementById("open-service-settings");
+      const serviceSettingsModal = document.getElementById("service-settings-modal");
+      const closeServiceSettingsBtn = document.getElementById("close-service-settings");
+      const cancelServiceSettingsBtn = document.getElementById("cancel-service-settings");
+      const saveServiceSettingsBtn = document.getElementById("save-service-settings");
+      const clearAmapKeyBtn = document.getElementById("clear-amap-key");
+      const settingsAmapKeyInput = document.getElementById("settings-amap-key");
+      const settingsAmapKeyStatus = document.getElementById("settings-amap-key-status");
+      const settingsStatusEl = document.getElementById("settings-status");
       const apiPill = document.getElementById("api-pill");
       const apiPillText = document.getElementById("api-pill-text");
       const listEl = document.getElementById("participant-list");
@@ -917,6 +1080,12 @@
             renderRanking(lastRanking.data, lastRanking.participants),
           );
         }
+        if (!serviceSettingsModal.hidden) {
+          const wasConfigured =
+            settingsAmapKeyStatus.textContent.includes("Configured") ||
+            settingsAmapKeyStatus.textContent.includes("已配置");
+          updateAmapKeyStatus(wasConfigured);
+        }
       }
 
       function updateApiPill() {
@@ -933,6 +1102,89 @@
           /* ignore */
         }
         applyI18n();
+      });
+
+      let clearAmapKeyRequested = false;
+
+      function setSettingsStatus(message, kind) {
+        settingsStatusEl.textContent = message || "";
+        settingsStatusEl.classList.toggle("ok", kind === "ok");
+        settingsStatusEl.classList.toggle("err", kind === "err");
+      }
+
+      function updateAmapKeyStatus(configured) {
+        settingsAmapKeyStatus.textContent = configured
+          ? t("amapKeyConfigured")
+          : t("amapKeyMissing");
+      }
+
+      function openServiceSettings() {
+        clearAmapKeyRequested = false;
+        settingsAmapKeyInput.value = "";
+        setSettingsStatus("", null);
+        serviceSettingsModal.hidden = false;
+        serviceSettingsModal.classList.add("open");
+        fetch("/api/service-settings")
+          .then((res) => res.json())
+          .then((body) => {
+            updateAmapKeyStatus(Boolean(body?.amapKey?.configured));
+          })
+          .catch(() => {
+            setSettingsStatus(t("settingsSaveFailed"), "err");
+          });
+      }
+
+      function closeServiceSettings() {
+        serviceSettingsModal.classList.remove("open");
+        serviceSettingsModal.hidden = true;
+      }
+
+      openServiceSettingsBtn.addEventListener("click", openServiceSettings);
+      closeServiceSettingsBtn.addEventListener("click", closeServiceSettings);
+      cancelServiceSettingsBtn.addEventListener("click", closeServiceSettings);
+      serviceSettingsModal.addEventListener("click", (ev) => {
+        if (ev.target === serviceSettingsModal) closeServiceSettings();
+      });
+
+      clearAmapKeyBtn.addEventListener("click", () => {
+        clearAmapKeyRequested = true;
+        settingsAmapKeyInput.value = "";
+        updateAmapKeyStatus(false);
+        setSettingsStatus("", null);
+      });
+
+      settingsAmapKeyInput.addEventListener("input", () => {
+        if (settingsAmapKeyInput.value.trim()) {
+          clearAmapKeyRequested = false;
+        }
+      });
+
+      saveServiceSettingsBtn.addEventListener("click", async () => {
+        const payload = {};
+        if (clearAmapKeyRequested) {
+          payload.clearAmapKey = true;
+        } else {
+          payload.amapKey = settingsAmapKeyInput.value;
+        }
+        setSettingsStatus("", null);
+        try {
+          const res = await fetch("/api/service-settings", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const body = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            setSettingsStatus(body.error || t("settingsSaveFailed"), "err");
+            return;
+          }
+          clearAmapKeyRequested = false;
+          settingsAmapKeyInput.value = "";
+          updateAmapKeyStatus(Boolean(body?.amapKey?.configured));
+          setSettingsStatus(t("settingsSaved"), "ok");
+        } catch {
+          setSettingsStatus(t("settingsSaveFailed"), "err");
+        }
       });
 
       function updateSearchGate() {

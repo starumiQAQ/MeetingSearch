@@ -183,6 +183,10 @@ describe("local web API", () => {
     expect(html).toContain("composer-address");
     expect(html).toContain("/api/geocode");
     expect(html).toContain("/api/search");
+    expect(html).toContain("open-service-settings");
+    expect(html).toContain("serviceSettings");
+    expect(html).toContain("服务设置");
+    expect(html).toContain("/api/service-settings");
     expect(html).toContain("map_provider_error");
     expect(html).toContain("empty_candidate_set");
     expect(html).not.toContain('name="lat"');
@@ -618,5 +622,215 @@ describe("buildMapServicesFromEnv via createApp", () => {
     } finally {
       await app.stop();
     }
+  });
+});
+
+describe("Service settings HTTP (AMAP_KEY)", () => {
+  async function withSettingsApp(
+    opts: {
+      envContents?: string;
+      serviceEnv?: import("../src/map-services.js").MapServicesEnv;
+      buildMapServices?: typeof buildMapServicesFromEnv;
+    },
+    run: (ctx: {
+      baseUrl: string;
+      envFilePath: string;
+      app: ReturnType<typeof createApp>;
+    }) => Promise<void>,
+  ) {
+    const { mkdtemp, writeFile, readFile } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const dir = await mkdtemp(join(tmpdir(), "ms-settings-"));
+    const envFilePath = join(dir, ".env");
+    if (opts.envContents !== undefined) {
+      await writeFile(envFilePath, opts.envContents, "utf8");
+    }
+
+    const serviceEnv = opts.serviceEnv ?? { AMAP_KEY: "" };
+    const build =
+      opts.buildMapServices ??
+      ((env: import("../src/map-services.js").MapServicesEnv) => {
+        const built = buildMapServicesFromEnv(env);
+        // Avoid live 高德 in unit tests: empty key → demo; non-empty → keyed fake.
+        if (!env.AMAP_KEY?.trim()) return built;
+        const keyed = new FakeMapProvider({
+          branchesByBrand: { 滨寿司: [branch] },
+          geocodeResults: {
+            望京: [
+              {
+                formattedAddress: "keyed-provider-望京",
+                coordinates: { lat: 39.99, lng: 116.47 },
+              },
+            ],
+            中关村: [uniqueHit],
+          },
+        });
+        keyed.setDrivingDistance(
+          { lat: 39.9, lng: 116.4 },
+          branch.coordinates,
+          1000,
+        );
+        keyed.setDrivingDistance(
+          { lat: 39.92, lng: 116.42 },
+          branch.coordinates,
+          2000,
+        );
+        return { ...built, mapProvider: keyed };
+      });
+
+    const initial = build(serviceEnv);
+    const app = createApp({
+      mapProvider: initial.mapProvider,
+      mapUi: initial.mapUi,
+      port: 0,
+      envFilePath,
+      serviceEnv,
+      buildMapServices: build,
+    });
+    await app.start();
+    try {
+      const address = app.server.address();
+      if (!address || typeof address === "string") {
+        throw new Error("expected TCP address");
+      }
+      await run({
+        baseUrl: `http://127.0.0.1:${address.port}`,
+        envFilePath,
+        app,
+      });
+    } finally {
+      await app.stop();
+    }
+  }
+
+  it("GET returns AMAP_KEY configured flag without plaintext", async () => {
+    await withSettingsApp(
+      {
+        serviceEnv: { AMAP_KEY: "secret-web-key-abcdef" },
+        envContents: "AMAP_KEY=secret-web-key-abcdef\n",
+      },
+      async ({ baseUrl }) => {
+        const res = await fetch(`${baseUrl}/api/service-settings`);
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.amapKey.configured).toBe(true);
+        const dumped = JSON.stringify(body);
+        expect(dumped).not.toContain("secret-web-key-abcdef");
+      },
+    );
+  });
+
+  it("PUT saves AMAP_KEY to .env preserving comments and other keys", async () => {
+    await withSettingsApp(
+      {
+        serviceEnv: { AMAP_KEY: "" },
+        envContents: "# keep me\nOTHER=1\nAMAP_KEY=\n",
+      },
+      async ({ baseUrl, envFilePath }) => {
+        const res = await fetch(`${baseUrl}/api/service-settings`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amapKey: "new-amap-key" }),
+        });
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.amapKey.configured).toBe(true);
+
+        const { readFile } = await import("node:fs/promises");
+        const disk = await readFile(envFilePath, "utf8");
+        expect(disk).toContain("# keep me");
+        expect(disk).toMatch(/OTHER=1/);
+        expect(disk).toMatch(/AMAP_KEY=new-amap-key/);
+      },
+    );
+  });
+
+  it("empty amapKey keeps existing; clearAmapKey wipes and hot-swaps to demo", async () => {
+    await withSettingsApp(
+      {
+        serviceEnv: { AMAP_KEY: "keep-me-key" },
+        envContents: "AMAP_KEY=keep-me-key\n",
+      },
+      async ({ baseUrl, envFilePath }) => {
+        const keep = await fetch(`${baseUrl}/api/service-settings`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amapKey: "" }),
+        });
+        expect(keep.status).toBe(200);
+        expect((await keep.json()).amapKey.configured).toBe(true);
+        const { readFile } = await import("node:fs/promises");
+        expect(await readFile(envFilePath, "utf8")).toMatch(
+          /AMAP_KEY=keep-me-key/,
+        );
+
+        // With key, geocode uses keyed fake
+        const keyedGeo = await fetch(`${baseUrl}/api/geocode`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ address: "望京" }),
+        });
+        expect((await keyedGeo.json()).candidates[0].formattedAddress).toBe(
+          "keyed-provider-望京",
+        );
+
+        const cleared = await fetch(`${baseUrl}/api/service-settings`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clearAmapKey: true }),
+        });
+        expect(cleared.status).toBe(200);
+        expect((await cleared.json()).amapKey.configured).toBe(false);
+        expect(await readFile(envFilePath, "utf8")).toMatch(/AMAP_KEY=\s*$/m);
+
+        // Demo provider answers 望京 with the standard demo hits
+        const demoGeo = await fetch(`${baseUrl}/api/geocode`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ address: "望京" }),
+        });
+        expect(demoGeo.status).toBe(200);
+        const demoBody = await demoGeo.json();
+        expect(demoBody.candidates[0].formattedAddress).toBe(
+          "北京市朝阳区望京街",
+        );
+      },
+    );
+  });
+
+  it("after saving AMAP_KEY, new geocode uses the hot-swapped provider", async () => {
+    await withSettingsApp(
+      {
+        serviceEnv: { AMAP_KEY: "" },
+        envContents: "",
+      },
+      async ({ baseUrl }) => {
+        const before = await fetch(`${baseUrl}/api/geocode`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ address: "望京" }),
+        });
+        expect((await before.json()).candidates[0].formattedAddress).toBe(
+          "北京市朝阳区望京街",
+        );
+
+        const save = await fetch(`${baseUrl}/api/service-settings`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amapKey: "live-key" }),
+        });
+        expect(save.status).toBe(200);
+
+        const after = await fetch(`${baseUrl}/api/geocode`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ address: "望京" }),
+        });
+        expect((await after.json()).candidates[0].formattedAddress).toBe(
+          "keyed-provider-望京",
+        );
+      },
+    );
   });
 });

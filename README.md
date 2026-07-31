@@ -24,6 +24,8 @@ Open http://localhost:3000 — enter free-text Participant addresses. The page g
 
 `.env` is gitignored. Commit only `.env.example` (empty key placeholders). Restrict the JS key with a domain whitelist in the 高德 console — it is injected into the page.
 
+You can also set `AMAP_KEY` (and later JS / QPS fields) from the in-app **Service settings** / 「服务设置」 control in the top bar. Saves rewrite the local `.env` and hot-swap the server MapProvider. **Do not expose this server on a public network** — there is no auth, so anyone who can reach it can rewrite `.env` and credentials (ADR-0004).
+
 `POST /api/search` 仍可传 `"concurrency"` 控制 MeetingSearch 侧并行调度；真正打高德的频率由 `AMAP_QPS` 闸住。
 
 ## API

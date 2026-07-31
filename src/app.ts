@@ -1,9 +1,15 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { upsertEnvKeys } from "./env-file.js";
 import { meetingSearch } from "./meeting-search.js";
-import type { MapUiConfig } from "./map-services.js";
+import {
+  buildMapServicesFromEnv,
+  type MapServicesEnv,
+  type MapServicesFromEnv,
+  type MapUiConfig,
+} from "./map-services.js";
 import type { MapProvider, MeetingSearchInput, ProximityObjective } from "./types.js";
 import { isEmptyCandidateSet, isMapProviderError } from "./types.js";
 
@@ -16,6 +22,12 @@ export type AppDeps = {
   mapProvider: MapProvider;
   port?: number;
   mapUi?: MapUiConfig;
+  /** Working-directory `.env` path for Service settings persistence. */
+  envFilePath?: string;
+  /** In-memory snapshot of the four service env keys (mutated on save). */
+  serviceEnv?: MapServicesEnv;
+  /** Override MapProvider/MapUi builder (tests inject fakes). */
+  buildMapServices?: (env: MapServicesEnv) => MapServicesFromEnv;
 };
 
 /** Partial hot-swap; omitted fields keep their current values. */
@@ -24,10 +36,17 @@ export type ReplaceMapServicesInput = {
   mapUi?: MapUiConfig;
 };
 
+type SecretFieldStatus = {
+  configured: boolean;
+};
+
 export function createApp(deps: AppDeps) {
   const port = deps.port ?? DEFAULT_PORT;
   let mapProvider = deps.mapProvider;
   let mapUi = deps.mapUi;
+  const envFilePath = deps.envFilePath ?? resolve(process.cwd(), ".env");
+  const serviceEnv: MapServicesEnv = { ...(deps.serviceEnv ?? {}) };
+  const buildMapServices = deps.buildMapServices ?? buildMapServicesFromEnv;
 
   const server = createServer(async (req, res) => {
     // Capture at request start so a mid-flight swap does not tear down in-flight work.
@@ -41,6 +60,16 @@ export function createApp(deps: AppDeps) {
 
       if (req.method === "GET" && url.pathname === "/") {
         await serveForm(res, mapUiForRequest);
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/api/service-settings") {
+        writeJson(res, 200, readServiceSettings());
+        return;
+      }
+
+      if (req.method === "PUT" && url.pathname === "/api/service-settings") {
+        await handlePutServiceSettings(req, res);
         return;
       }
 
@@ -68,16 +97,70 @@ export function createApp(deps: AppDeps) {
     }
   });
 
+  function secretStatus(value: string | undefined): SecretFieldStatus {
+    return { configured: Boolean(value?.trim()) };
+  }
+
+  function readServiceSettings(): { amapKey: SecretFieldStatus } {
+    return {
+      amapKey: secretStatus(serviceEnv.AMAP_KEY),
+    };
+  }
+
+  function applyBuiltServices(built: MapServicesFromEnv): void {
+    mapProvider = built.mapProvider;
+    mapUi = built.mapUi;
+  }
+
+  async function handlePutServiceSettings(
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
+    const body = await readJsonBody(req);
+    if (!body || typeof body !== "object") {
+      throw new HttpError(400, "Body must be a JSON object");
+    }
+    const o = body as Record<string, unknown>;
+
+    const clearAmapKey = o.clearAmapKey === true;
+    const amapKeyRaw = o.amapKey;
+    if (
+      amapKeyRaw !== undefined &&
+      amapKeyRaw !== null &&
+      typeof amapKeyRaw !== "string"
+    ) {
+      throw new HttpError(400, "amapKey must be a string");
+    }
+
+    const diskUpdates: { AMAP_KEY?: string } = {};
+
+    if (clearAmapKey) {
+      serviceEnv.AMAP_KEY = "";
+      diskUpdates.AMAP_KEY = "";
+    } else if (typeof amapKeyRaw === "string" && amapKeyRaw.trim() !== "") {
+      serviceEnv.AMAP_KEY = amapKeyRaw.trim();
+      diskUpdates.AMAP_KEY = amapKeyRaw.trim();
+    }
+    // Empty / omitted amapKey without clear → keep current value (no disk write for key).
+
+    if (Object.keys(diskUpdates).length > 0) {
+      upsertEnvKeys(envFilePath, diskUpdates);
+    }
+
+    applyBuiltServices(buildMapServices(serviceEnv));
+    writeJson(res, 200, readServiceSettings());
+  }
+
   return {
     server,
     start(): Promise<void> {
-      return new Promise((resolve) => {
-        server.listen(port, () => resolve());
+      return new Promise((resolveListen) => {
+        server.listen(port, () => resolveListen());
       });
     },
     stop(): Promise<void> {
-      return new Promise((resolve, reject) => {
-        server.close((err) => (err ? reject(err) : resolve()));
+      return new Promise((resolveClose, reject) => {
+        server.close((err) => (err ? reject(err) : resolveClose()));
       });
     },
     /**
@@ -103,6 +186,15 @@ class HttpError extends Error {
   ) {
     super(message);
   }
+}
+
+function writeJson(
+  res: ServerResponse,
+  status: number,
+  body: unknown,
+): void {
+  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
+  res.end(JSON.stringify(body));
 }
 
 function writeMapProviderFailure(res: ServerResponse, message: string): void {

@@ -4,7 +4,7 @@
 
 [![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
 
-帮一群人找到最适合碰面的品牌门店：按真实驾车距离，给附近所有分店排序。
+帮大家找到最适合碰面的品牌门店：按真实驾车距离，给附近所有分店排序。
 
 周末约饭、同学聚会、见客户……只要大家不在同一个地方，选店就是件麻烦事。打开地图一家家比，要么凭感觉，要么只照顾了离得近的人。MeetingSearch 把这个问题变成一次简单的搜索：填上每个人的位置，选一家品牌（比如 滨寿司），它就会找出附近所有分店，用真实的驾车路程计算每个人到每家店的距离，最后按你选的目标给出排名和推荐门店。
 

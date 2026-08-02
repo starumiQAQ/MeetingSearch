@@ -1,8 +1,13 @@
 {
   "name": "meeting-search",
   "version": "0.1.0",
+  "description": "帮一群人找到最适合碰面的品牌门店：按真实驾车距离，给附近所有分店排序。",
   "private": true,
+  "license": "UNLICENSED",
   "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "dev": "tsx src/server.ts",
     "start": "tsx src/server.ts",

@@ -4,7 +4,7 @@
 
 ## 开始之前
 
-1. 阅读根目录 [`README.md`](./README.md)（运行方式与 API）。
+1. 阅读根目录 [`README.md`](./README.md)（运行方式）与 [`docs/api.md`](./docs/api.md)（API 文档）。
 2. 阅读 [`CONTEXT.md`](./CONTEXT.md) —— 领域用语以该文件为准（Participant、Brand、Branch、Ranking、Proximity objective 等）。写 issue、PR、测试名和注释时请使用这些术语，不要随意换同义词。
 3. 若改动触及地图提供方、本地 UI、浏览器地图或服务设置，请先扫一眼 [`docs/adr/`](./docs/adr/) 中相关 ADR；若方案与已有 ADR 冲突，请在 PR 里明确写出并说明理由。
 
